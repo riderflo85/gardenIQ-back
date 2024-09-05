@@ -4,11 +4,12 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-django = "==4.1.8"
+django = "*"
 djangorestframework = "*"
 django-filter = "*"
 django-cors-headers = "*"
 django-extensions = "*"
+pyserial = "*"
 
 [dev-packages]
 

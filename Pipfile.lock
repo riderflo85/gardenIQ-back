@@ -1,11 +1,11 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "4643dd27834a669fe72af6d330bf01813b1bb4ea67910bd865b44341b3e128a1"
+            "sha256": "c411fc4ea239298fb5163b63afdb6992e93dc8ff60e1c3f5f3704208f886d9d0"
         },
         "pipfile-spec": 6,
         "requires": {
-            "python_version": "3.9"
+            "python_version": "3.12.6"
         },
         "sources": [
             {
@@ -26,11 +26,12 @@
         },
         "django": {
             "hashes": [
-                "sha256:1ddc333a16fc139fd253035a1606bb24261951bbc3a6ca256717fa06cc41a898",
-                "sha256:6f1616c2786c408ce86ab7e10f792b8f15742f7b7b7460243929cb371e7f1dad"
+                "sha256:021ffb7fdab3d2d388bc8c7c2434eb9c1f6f4d09e6119010bbb1694dda286bc2",
+                "sha256:71603f27dac22a6533fb38d83072eea9ddb4017fead6f67f2562a40402d61c3f"
             ],
             "index": "pypi",
-            "version": "==4.2.16"
+            "markers": "python_version >= '3.10'",
+            "version": "==5.1.1"
         },
         "django-cors-headers": {
             "hashes": [
@@ -38,6 +39,7 @@
                 "sha256:92cf4633e22af67a230a1456cb1b7a02bb213d6536d2dcb2a4a24092ea9cebc2"
             ],
             "index": "pypi",
+            "markers": "python_version >= '3.8'",
             "version": "==4.4.0"
         },
         "django-extensions": {
@@ -46,6 +48,7 @@
                 "sha256:9600b7562f79a92cbf1fde6403c04fee314608fefbb595502e34383ae8203401"
             ],
             "index": "pypi",
+            "markers": "python_version >= '3.6'",
             "version": "==3.2.3"
         },
         "django-filter": {
@@ -54,6 +57,7 @@
                 "sha256:d8ccaf6732afd21ca0542f6733b11591030fa98669f8d15599b358e24a2cd9c3"
             ],
             "index": "pypi",
+            "markers": "python_version >= '3.8'",
             "version": "==24.3"
         },
         "djangorestframework": {
@@ -62,6 +66,7 @@
                 "sha256:36fe88cd2d6c6bec23dca9804bab2ba5517a8bb9d8f47ebc68981b56840107ad"
             ],
             "index": "pypi",
+            "markers": "python_version >= '3.8'",
             "version": "==3.15.2"
         },
         "pyserial": {
@@ -79,14 +84,6 @@
             ],
             "markers": "python_version >= '3.8'",
             "version": "==0.5.1"
-        },
-        "typing-extensions": {
-            "hashes": [
-                "sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d",
-                "sha256:1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8"
-            ],
-            "markers": "python_version < '3.11'",
-            "version": "==4.12.2"
         }
     },
     "develop": {}

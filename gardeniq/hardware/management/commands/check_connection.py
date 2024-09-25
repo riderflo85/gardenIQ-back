@@ -3,7 +3,7 @@ import serial
 from django.core.management import BaseCommand
 from django.conf import settings
 
-from gardeniq.telemetry.utils import list_connected_devices
+from gardeniq.hardware.utils import list_connected_devices
 
 
 class Command(BaseCommand):

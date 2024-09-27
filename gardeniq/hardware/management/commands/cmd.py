@@ -3,11 +3,11 @@ import serial
 from django.core.management import BaseCommand
 from django.conf import settings
 
-from gardeniq.telemetry.utils import list_connected_devices
+from gardeniq.hardware.utils import list_connected_devices
 
 
 class Command(BaseCommand):
-    help = "Check if the card hardware is connect."
+    help = "Exchange a text with the card hardware USB connected."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -26,13 +26,20 @@ class Command(BaseCommand):
         if port not in list_connected_devices(settings.LD_FORMATS.LIST_DEVICES):
             self.stderr.write(f'port `{port}` is not found !')
             return False
-        ser = serial.Serial()
+        ser = serial.Serial(timeout=0.2)
         ser.baudrate = options['baud']
         ser.port = options['port']
         ser.open()
         if ser.is_open:
-            self.stdout.write(self.style.SUCCESS('Test hardware connection is done !'))
-            self.stdout.write(self.style.SUCCESS(' Connection closed !'))
+            self.stdout.write(self.style.SUCCESS('Connection opened !\nTape q to quit prompt.'))
+            ser.flush()
+            while True:
+                hardware_msg = ser.read_until().strip()
+                self.stdout.write('HDW : %s' % hardware_msg.decode())
+                text = input('>>> ')
+                if text == 'q':
+                    break
+                ser.write(f'{text}\r'.encode())
         else:
             self.stdout.write(self.style.ERROR('Test hardware connection is failed !'))
         ser.close()

@@ -18,3 +18,5 @@ ROOT_URLCONF = 'gardeniq.urls'
 
 # https://docs.djangoproject.com/fr/4.1/ref/settings/#wsgi-application
 WSGI_APPLICATION = 'gardeniq.wsgi.application'
+
+ASGI_APPLICATION = 'gardeniq.asgi.application'

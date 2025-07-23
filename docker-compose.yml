@@ -1,0 +1,45 @@
+# version: "3.9"
+
+services:
+  # 🔧 Django PROD with Daphne
+  web:
+    build:
+      context: .
+      dockerfile: docker/prod/Dockerfile
+    volumes:
+      # - static_volume:/app/static
+      - ./db.sqlite3:/app/db.sqlite3
+    expose:
+      - "8000"
+    env_file:
+      - ./docker/prod/.env
+
+  # 🌐 Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./docker/prod/nginx.conf:/etc/nginx/nginx.conf:ro
+      # - static_volume:/app/static
+    ports:
+      - "8001:80"
+    depends_on:
+      - web
+
+  # 🧪 Django DEV with hot reload
+  web-dev:
+    build:
+      context: .
+      dockerfile: docker/dev/Dockerfile
+    volumes:
+      - .:/app  # Hot reload du code
+      - ./db.sqlite3:/app/db.sqlite3
+    ports:
+      - "8000:8000"  # Direct access
+    env_file:
+      - ./docker/dev/.env
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+
+# volumes:
+  # static_volume:

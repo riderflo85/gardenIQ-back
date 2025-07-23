@@ -4,6 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+daphne = "*"
 django = "*"
 djangorestframework = "*"
 django-filter = "*"
@@ -14,4 +15,4 @@ pyserial = "*"
 [dev-packages]
 
 [requires]
-python_version = "3.12.6"
+python_version = "3.13.5"

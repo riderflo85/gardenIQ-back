@@ -35,6 +35,9 @@ services:
       - ./db.sqlite3:/app/db.sqlite3
     ports:
       - "8000:8000"  # Direct access
+    # USB connection. Add your usb mounted path.
+    # devices:
+    #   - /dev/tty.usbmodem141101:/dev/ttyUSB0
     env_file:
       - ./docker/dev/.env
     command: >

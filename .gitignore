@@ -130,3 +130,6 @@ dmypy.json
 
 # IDE VSCODE
 .vscode
+
+# Other
+docker-compose-usb-override.yml

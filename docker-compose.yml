@@ -36,8 +36,8 @@ services:
     ports:
       - "8000:8000"  # Direct access
     # USB connection. Add your usb mounted path.
+    # This directive in docker-compose-usb-override.yml file generated in start_usb_docker.py script.
     # devices:
-    #   - /dev/tty.usbmodem141101:/dev/ttyUSB0
     env_file:
       - ./docker/dev/.env
     command: >

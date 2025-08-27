@@ -15,6 +15,8 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
+    'gardeniq.base',
+    'gardeniq.orderlg',
     'gardeniq.telemetry',
     'gardeniq.hardware',
 ]

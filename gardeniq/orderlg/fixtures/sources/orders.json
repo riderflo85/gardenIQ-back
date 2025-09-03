@@ -1,0 +1,11 @@
+[
+    {
+        "id": 1,
+        "name": "Récupérer la température",
+        "slug": "get_temp",
+        "description": "Récupérer la température de la sonde passée en argument.",
+        "action_type": "get",
+        "arguments": [1],
+        "is_enable": true
+    }
+]

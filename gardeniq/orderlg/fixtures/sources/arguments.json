@@ -1,0 +1,11 @@
+[
+    {
+        "id": 1,
+        "slug": "-s",
+        "description": "Sonde demandée.\nNuméro du PIN sur la carte.\nOUNuméro de l’objet sonde.",
+        "value_type": "int",
+        "required": true,
+        "is_option": false,
+        "is_enable": true
+    }
+]

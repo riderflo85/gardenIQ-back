@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             name='Argument',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('slug', models.SlugField(help_text='A slug is a short label for something, containing only letters, numbers, underscores or hyphens.', verbose_name='slug')),
+                ('slug', models.SlugField(unique=True, help_text='A slug is a short label for something, containing only letters, numbers, underscores or hyphens.', verbose_name='slug')),
                 ('description', models.TextField(verbose_name='description')),
                 ('is_enabled', models.BooleanField(default=True, help_text='Designate whether this object is enabled and will show up in searches by default.', verbose_name='is enabled')),
                 ('value_type', models.CharField(choices=[('int', 'integer'), ('float', 'float'), ('str', 'string'), ('bool', 'boolean'), ('list', 'list')], help_text='A value type of a argument.', max_length=5, verbose_name='value type')),
@@ -30,7 +30,7 @@ class Migration(migrations.Migration):
             name='Order',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('slug', models.SlugField(help_text='A slug is a short label for something, containing only letters, numbers, underscores or hyphens.', verbose_name='slug')),
+                ('slug', models.SlugField(unique=True, help_text='A slug is a short label for something, containing only letters, numbers, underscores or hyphens.', verbose_name='slug')),
                 ('description', models.TextField(verbose_name='description')),
                 ('name', models.CharField(max_length=255, verbose_name='name')),
                 ('is_enabled', models.BooleanField(default=True, help_text='Designate whether this object is enabled and will show up in searches by default.', verbose_name='is enabled')),

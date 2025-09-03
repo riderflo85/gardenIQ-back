@@ -8,6 +8,7 @@ from gardeniq.base.exceptions import DeleteProtectedException
 
 class SlugMixinModel(models.Model):
     slug = models.SlugField(
+        unique=True,
         verbose_name="slug",
         help_text="A slug is a short label for something, containing only letters, numbers, underscores or hyphens."
     )

@@ -1,6 +1,7 @@
 from collections import defaultdict
-from typing import Dict, List
 from importlib import import_module
+from typing import Dict
+from typing import List
 
 from django.apps import apps
 from django.conf import settings

@@ -2,9 +2,9 @@ from enum import Enum
 
 
 class ListDevicesFormat(Enum):
-    STR = 'str'
-    LIST_DEVICES = 'list_devices'
-    LIST_NAMES = 'list_names'
+    STR = "str"
+    LIST_DEVICES = "list_devices"
+    LIST_NAMES = "list_names"
 
 
 # Baudrate card transmission

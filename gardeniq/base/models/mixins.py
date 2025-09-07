@@ -2,15 +2,15 @@ from typing import Optional
 
 from django.db import models
 
-from gardeniq.base.exceptions import DisabledProtectedException
 from gardeniq.base.exceptions import DeleteProtectedException
+from gardeniq.base.exceptions import DisabledProtectedException
 
 
 class SlugMixinModel(models.Model):
     slug = models.SlugField(
         unique=True,
         verbose_name="slug",
-        help_text="A slug is a short label for something, containing only letters, numbers, underscores or hyphens."
+        help_text="A slug is a short label for something, containing only letters, numbers, underscores or hyphens.",
     )
 
     class Meta:
@@ -18,9 +18,7 @@ class SlugMixinModel(models.Model):
 
 
 class DescriptionMixinModel(models.Model):
-    description = models.TextField(
-        verbose_name="description"
-    )
+    description = models.TextField(verbose_name="description")
 
     class Meta:
         abstract = True

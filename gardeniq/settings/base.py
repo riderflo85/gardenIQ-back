@@ -7,8 +7,6 @@ from gardeniq.settings.django.middlewares import *
 from gardeniq.settings.django.paths import *
 from gardeniq.settings.django.storages import *
 from gardeniq.settings.django.templates import *
-
-from gardeniq.settings.third_party.rest_framework import *
-
 from gardeniq.settings.project.cards import *
 from gardeniq.settings.project.fixtures import *
+from gardeniq.settings.third_party.rest_framework import *

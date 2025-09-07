@@ -1,7 +1,9 @@
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+from typing import Callable
 
 from django.db.models import Model
+
 from rest_framework.parsers import JSONParser
 from rest_framework.serializers import ModelSerializer
 
@@ -17,7 +19,9 @@ class BaseSeeder:
     source_file: Path
     dependencies = []
 
-    def __init__(self, success_logger: Callable[[object],str|Any], error_logger: Callable[[object],str|Any]) -> None:
+    def __init__(
+        self, success_logger: Callable[[object], str | Any], error_logger: Callable[[object], str | Any]
+    ) -> None:
         """Check if class attributs is set by children."""
         assert issubclass(self.serializer, ModelSerializer)
         assert issubclass(self.model, Model)
@@ -56,7 +60,7 @@ class BaseSeeder:
                 updated_entrie = ser.save()
                 self.success_logger(f"✅ updated successfully entrie : {updated_entrie}")
 
-    def seed(self, authorize_update: bool=False) -> None:
+    def seed(self, authorize_update: bool = False) -> None:
         """Fill the database with source file data.
         Source file data is a json file.
         """
@@ -67,4 +71,6 @@ class BaseSeeder:
             elif authorize_update:
                 self._update_entries(data)
             else:
-                self.error_logger(f"❌ the entries for `{self.model}` already exist and you have not set `authorize_update` argument !")
+                self.error_logger(
+                    f"❌ the entries for `{self.model}` already exist and you have not set `authorize_update` argument !"
+                )

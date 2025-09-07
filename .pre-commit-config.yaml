@@ -1,0 +1,50 @@
+repos:
+  - repo: local
+    hooks:
+      - id: black
+        name: black
+        entry: black
+        language: system
+        types: [python]
+        require_serial: true
+        args: [--force-exclude, gardeniq]
+
+      - id: check-json
+        name: Check Json
+        description: checks json files for parseable syntax.
+        entry: check-json
+        language: system
+        types: [json]
+
+      - id: end-of-file-fixer
+        name: Fix End of Files
+        description: ensures that a file is either empty, or ends with one newline.
+        entry: end-of-file-fixer
+        language: system
+        types: [text]
+        stages: [pre-commit, pre-push, manual]
+        exclude: '^.*/migrations/.*$'
+
+      - id: flake8
+        name: flake8
+        entry: flake8
+        language: system
+        types: [python]
+        require_serial: true
+
+      - id: isort
+        name: isort
+        entry: isort
+        language: system
+        types: [python]
+        exclude: '^.*/migrations/.*$'
+
+      - id: trailing-whitespace
+        name: Trim Trailing Whitespace
+        description: trims trailing whitespace, except for markdown files.
+        entry: trailing-whitespace-fixer
+        language: system
+        types: [text]
+        stages: [pre-commit, pre-push, manual]
+        exclude: '^.*/migrations/.*$'
+        args: [--markdown-linebreak-ext=md]

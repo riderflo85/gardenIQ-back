@@ -17,6 +17,11 @@ pytest = "*"
 pytest-django = "*"
 pytest-xdist = "*"
 pytest-mock = "*"
+black = "*"
+flake8 = "*"
+isort = "*"
+pre-commit = "*"
+pre-commit-hooks = "*"
 
 [requires]
 python_version = "3.13.5"

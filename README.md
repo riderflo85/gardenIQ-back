@@ -8,7 +8,7 @@ L'API de gardenIQ est développée en Python3 avec Django et Django Rest Framewo
 Pour configurer le projet vous avez deux options disponible :
 - Avec un [environnement virtuel](#installation-environnement-virtuel)
 - Avec [Docker et docker compose](#docker-et-docker-compose)
---- 
+---
 
 # Installation environnement virtuel
 Le projet utilise Python version 3.13.5. Vérifie que la bonne version est bien présente.
@@ -24,17 +24,17 @@ Une fois que tu as installé `pyenv` et configuré la version Python appropriée
 ### Étapes :
 
 1. **Installer pipenv** en utilisant `pip` (le gestionnaire de paquets Python intégré) :
-    
+
     ```bash
     pip install pipenv
     ```
-    
+
 2. **Vérifie l’installation** :
-    
+
     ```bash
     pipenv --version
     ```
-    
+
 
 ---
 
@@ -54,31 +54,38 @@ cd gardenIQ-back
 ### 2.2. Créer et activer l'environnement virtuel avec `pipenv`
 
 1. **Créer l'environnement virtuel et installer les dépendances** :
-    
+
     ```bash
     pipenv install --dev
     ```
-    
+
     Cette commande va :
-    
+
     - Créer un environnement virtuel basé sur la version Python 3.13.5
     - Installer les dépendances spécifiées dans le fichier `Pipfile`.
 2. **Activer l'environnement virtuel** :
-    
+
     ```bash
     pipenv shell
     ```
-    
+
 3. **Vérifie que l'environnement est bien activé** :
-    
+
     ```bash
     python --version
     ```
-    
-    Tu devrais voir `Python 3.13.5`.
-    
 
-### 2.3. Lancer le serveur backend
+    Tu devrais voir `Python 3.13.5`.
+
+### 2.3. Installer les hooks python pour git
+
+Le projet est configuré pour exécuter des hooks lorsque tu fais un commit avec git. Il faut donc que tu installes les hooks.
+
+```bash
+pre-commit install
+```
+
+### 2.4. Lancer le serveur backend
 
 Une fois dans l'environnement virtuel, tu peux exécuter le serveur backend :
 
@@ -93,13 +100,13 @@ python manage.py runserver
 ## 3. Notes supplémentaires
 
 - **Gestion des dépendances** : Si tu as besoin d'ajouter une nouvelle bibliothèque au projet, utilise la commande suivante pour ajouter la dépendance au `Pipfile` :
-    
+
     ```bash
     pipenv install <package>
     ```
-    
+
 - **Synchronisation des dépendances** : Pour synchroniser tes dépendances avec celles définies dans le `Pipfile.lock` (par exemple, après un `git pull`), utilise :
-    
+
     ```bash
     pipenv sync
     ```

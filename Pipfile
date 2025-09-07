@@ -13,6 +13,10 @@ django-extensions = "*"
 pyserial = "*"
 
 [dev-packages]
+pytest = "*"
+pytest-django = "*"
+pytest-xdist = "*"
+pytest-mock = "*"
 
 [requires]
 python_version = "3.13.5"

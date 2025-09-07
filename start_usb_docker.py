@@ -3,11 +3,12 @@ import subprocess
 import sys
 from argparse import ArgumentParser
 from datetime import datetime
-from typing import Literal, List
+from typing import List
+from typing import Literal
 
 from django.core.management.color import color_style
-from serial.tools import list_ports
 
+from serial.tools import list_ports
 
 DOCKER_USB_PORT = "/dev/ttyUSBCard1"
 OVERRIDE_FILE = "docker-compose-usb-override.yml"
@@ -33,13 +34,14 @@ parser.add_argument(
     dest="filter_by",
     choices=SEARCH_TYPE,
     default=SEARCH_TYPE[0],
-    help="The filter search device by type ('manufacturer' or 'hwid')."
+    help="The filter search device by type ('manufacturer' or 'hwid').",
 )
 parser.add_argument(
     "-v",
     dest="value_filter",
     default="MicroPython",
-    help="The value of filter search device. This info can get with 'python manage.py list_devices --verbose' django command."
+    help="The value of filter search device. \
+This info can get with 'python manage.py list_devices --verbose' django command.",
 )
 
 
@@ -76,7 +78,8 @@ def find_usb_device(filter_by: Literal["hwid", "manufacturer"], filter_value: st
 
     return [found, device_port]
 
-def generate_override(card_path: str, override_file: str=OVERRIDE_FILE) -> None:
+
+def generate_override(card_path: str, override_file: str = OVERRIDE_FILE) -> None:
     """Generate override docker-compose file to add `devices` directive.
 
     Args:
@@ -95,40 +98,39 @@ def generate_override(card_path: str, override_file: str=OVERRIDE_FILE) -> None:
     )
     with open(override_file, "w") as f:
         f.write(content)
-    print("📝" +
-        style.SUCCESS(f" File `{override_file}` generated with device port `{card_path}`.")
-    )
+    print("📝" + style.SUCCESS(f" File `{override_file}` generated with device port `{card_path}`."))
+
 
 def launch_docker_compose():
     """Launch the docker compose with merged configuration files."""
-    print("🚀" +
-        style.HTTP_INFO(" Launch docker compose...")
-    )
+    print("🚀" + style.HTTP_INFO(" Launch docker compose..."))
     subprocess.run(["docker", "compose", "-f", "docker-compose.yml", "-f", OVERRIDE_FILE, "up", "web-dev"])
+
 
 def main(filter_type, filter_value):
     usb_card, usb_port = find_usb_device(filter_type, filter_value)
 
     if usb_card:
-        print("✅" +
-            style.SUCCESS(f" usb card successfully detected !\n\tHost port is `{usb_port}`\n\tMounted on docker to `{DOCKER_USB_PORT}`\n")
+        print(
+            "✅"
+            + style.SUCCESS(
+                f" usb card successfully detected !\n\tHost port is `{usb_port}`\n\t\
+Mounted on docker to `{DOCKER_USB_PORT}`\n"
+            )
         )
     else:
-        print("❌" +
-            style.ERROR(" usb card not detected :(")
-        )
+        print("❌" + style.ERROR(" usb card not detected :("))
         sys.exit(1)
 
     if not os.access(usb_port, os.R_OK | os.W_OK):
-        print("⚠️" +
-            style.WARNING(f"⚠️ Usb card `{usb_port}` exist but does not access: Permision denied.")
-        )
+        print("⚠️" + style.WARNING(f"⚠️ Usb card `{usb_port}` exist but does not access: Permision denied."))
         print(style.WARNING("   Add your user to `dialout` group and restart session :"))
         print(style.WARNING("   sudo usermod -aG dialout $USER"))
         sys.exit(2)
 
     generate_override(usb_port)
     launch_docker_compose()
+
 
 if __name__ == "__main__":
     args = parser.parse_args()

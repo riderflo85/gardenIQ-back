@@ -1,9 +1,8 @@
 from typing import Literal
 
-from gardeniq.settings.project.cards import ListDevicesFormat
-
 from serial.tools.list_ports import comports
 
+from gardeniq.settings.project.cards import ListDevicesFormat
 
 # For typing
 LDFormats = Literal[
@@ -11,6 +10,8 @@ LDFormats = Literal[
     ListDevicesFormat.LIST_DEVICES,
     ListDevicesFormat.LIST_NAMES,
 ]
+
+
 def list_connected_devices(ret_type: LDFormats, verbose: bool = False) -> str | list:
     """Get the connected USB devices.
 
@@ -25,23 +26,23 @@ def list_connected_devices(ret_type: LDFormats, verbose: bool = False) -> str | 
 
     match ret_type:
         case ListDevicesFormat.STR:
-            devices_string_informations = ''
+            devices_string_informations = ""
 
             for device in devices:
                 if not verbose:
-                    devices_string_informations = f'{devices_string_informations}\n{device.name}'
+                    devices_string_informations = f"{devices_string_informations}\n{device.name}"
                     continue
 
                 more_infos = [
-                    f'hwid: {device.hwid}',
-                    f'product: {device.product}',
-                    f'desc: {device.description}',
-                    f'location: {device.location}',
-                    f'interface: {device.interface}',
-                    f'manufacturer: {device.manufacturer}'
+                    f"hwid: {device.hwid}",
+                    f"product: {device.product}",
+                    f"desc: {device.description}",
+                    f"location: {device.location}",
+                    f"interface: {device.interface}",
+                    f"manufacturer: {device.manufacturer}",
                 ]
-                more_infos_stringify = '\n\t'+'\n\t'.join(more_infos)
-                devices_string_informations = f'{devices_string_informations}\n{device.device}{more_infos_stringify}\n'
+                more_infos_stringify = "\n\t" + "\n\t".join(more_infos)
+                devices_string_informations = f"{devices_string_informations}\n{device.device}{more_infos_stringify}\n"
 
             return devices_string_informations
 

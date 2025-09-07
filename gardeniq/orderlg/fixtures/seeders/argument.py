@@ -1,6 +1,7 @@
-from .orderlg import OrderlgSeeder
 from gardeniq.orderlg.models import Argument
 from gardeniq.orderlg.serializers import ArgumentSerializer
+
+from .orderlg import OrderlgSeeder
 
 
 class ArgumentSeeder(OrderlgSeeder):

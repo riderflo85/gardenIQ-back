@@ -1,9 +1,10 @@
-from typing import List, Tuple
+from typing import List
+from typing import Tuple
 
 import pytest
 
-from gardeniq.base.fixtures.seeders import SeedersManager
 from gardeniq.base.fixtures.seeders import BaseSeeder
+from gardeniq.base.fixtures.seeders import SeedersManager
 
 
 class TestManager:
@@ -17,7 +18,7 @@ class TestManager:
 
     @pytest.fixture
     def fake_seeder(self, mocker):
-        def _make_fake_seeder(seeders_attrs: List[Tuple[str,List[str]]]) -> List[object]:
+        def _make_fake_seeder(seeders_attrs: List[Tuple[str, List[str]]]) -> List[object]:
             """Make a fake seeder with dependencies.
 
             Args:
@@ -42,6 +43,7 @@ class TestManager:
                 new_fake_cls.dependencies = cls_dep
                 fakes_cls.append(new_fake_cls)
             return fakes_cls
+
         return _make_fake_seeder
 
     def test_import_seeders_with_all_apps(self):
@@ -61,7 +63,6 @@ class TestManager:
             assert issubclass(seeder_klass, BaseSeeder)
             seeders_name.append(seeder_klass.__name__)
         assert seeders_name == expected_seeders_name
-
 
     @pytest.mark.parametrize(
         "app_name, expected_seeders_name",

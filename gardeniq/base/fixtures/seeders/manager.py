@@ -6,6 +6,8 @@ from typing import List
 from django.apps import apps
 from django.conf import settings
 
+from .base import BaseSeeder
+
 
 class SeedersManager:
 
@@ -72,7 +74,7 @@ class SeedersManager:
         )
         self._import_seeders_module(app_name, potential_seeders)
 
-    def build_seeder_graph(self, seed_classes: List) -> Dict:
+    def build_seeder_graph(self, seed_classes: List[type[BaseSeeder]]) -> Dict:
         """Build the graph dependencies seeders."""
         graph = defaultdict(list)
         name_to_class = {kls.__name__: kls for kls in seed_classes}
@@ -84,26 +86,31 @@ class SeedersManager:
 
         return graph
 
-    def togological_sort(self, seed_classes: List) -> List:
+    def topological_sort(self, seed_classes: List[type[BaseSeeder]]) -> List[type[BaseSeeder]]:
         """Sort seeders classes with topological logic based on dependencies seeds."""
         graph = self.build_seeder_graph(seed_classes)
+        no_dependencies = list(filter(lambda s: len(s.dependencies) == 0, seed_classes))
+        # sort seed class by string name
+        no_dependencies.sort(key=lambda el: el.__name__)
         visited = set()
         tmp = set()
-        result = []
+        result = no_dependencies + []
 
         def visit(seeder):
-            if seeder not in visited:
+            if seeder in tmp:
+                raise RuntimeError(f"Cyclic dependency detected with <{seeder.__name__}>")
+            if seeder not in visited and seeder not in no_dependencies:
                 tmp.add(seeder)
                 for dep in graph[seeder]:
                     visit(dep)
                 visited.add(seeder)
                 tmp.remove(seeder)
+                result.append(seeder)
 
-        for klass in seed_classes:
+        for klass in filter(lambda s: s not in no_dependencies, seed_classes):
             if klass not in visited:
                 visit(klass)
 
-        result = list(visited)
         tmp.clear()
         visited.clear()
         return result

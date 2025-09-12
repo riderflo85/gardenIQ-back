@@ -11,8 +11,8 @@ class TestManager:
     fake_seeders_attrs = [
         ("FooSeeder", ["TotoSeeder"]),
         ("BlaSeeder", []),
-        ("LoremSeeder", ["FooSeeder", "BlaSeeder"]),
         ("BazSeeder", ["LoremSeeder"]),
+        ("LoremSeeder", ["FooSeeder", "BlaSeeder"]),
         ("TotoSeeder", []),
     ]
 
@@ -82,13 +82,13 @@ class TestManager:
     def test_graph_dependencies(self, fake_seeder):
         # GiVEN
         fake_seeders_obj = fake_seeder(self.fake_seeders_attrs)
-        FooSeeder, BlaSeeder, LoremSeeder, BazSeeder, TotoSeeder = fake_seeders_obj
+        FooSeeder, BlaSeeder, BazSeeder, LoremSeeder, TotoSeeder = fake_seeders_obj
 
         expected = {
             FooSeeder: [TotoSeeder],
             BlaSeeder: [],
-            LoremSeeder: [FooSeeder, BlaSeeder],
             BazSeeder: [LoremSeeder],
+            LoremSeeder: [FooSeeder, BlaSeeder],
             TotoSeeder: [],
         }
 
@@ -102,19 +102,19 @@ class TestManager:
     def test_sorted_seeders_by_dependencies(self, fake_seeder):
         # GIVEN
         fake_seeders_obj = fake_seeder(self.fake_seeders_attrs)
-        FooSeeder, BlaSeeder, LoremSeeder, BazSeeder, TotoSeeder = fake_seeders_obj
+        FooSeeder, BlaSeeder, BazSeeder, LoremSeeder, TotoSeeder = fake_seeders_obj
 
         expected = [
+            BlaSeeder,
             TotoSeeder,
             FooSeeder,
-            BlaSeeder,
             LoremSeeder,
             BazSeeder,
         ]
 
         # WHEN
         seeds_manager = SeedersManager()
-        sorted_seeders = seeds_manager.togological_sort(fake_seeders_obj)
+        sorted_seeders = seeds_manager.topological_sort(fake_seeders_obj)
 
         # THEN
         assert sorted_seeders == expected

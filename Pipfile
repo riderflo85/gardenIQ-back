@@ -23,6 +23,7 @@ isort = "*"
 pre-commit = "*"
 pre-commit-hooks = "*"
 coverage = "*"
+pytest-cov = "*"
 
 [requires]
 python_version = "3.13.5"

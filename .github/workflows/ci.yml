@@ -6,6 +6,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      DJANGO_SETTINGS_MODULE: ${{ secrets.DJANGO_SETTINGS_MODULE }}
+      DJANGO_ALLOWED_HOSTS: ${{ secrets.DJANGO_ALLOWED_HOSTS }}
+      DJANGO_DEBUG: ${{ secrets.DJANGO_DEBUG }}
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+      SQL_ENGINE: ${{ secrets.SQL_ENGINE }}
+      SQL_NAME: ${{ secrets.SQL_NAME }}
+
     steps:
       # 1. Get code
       - name: Checkout repository

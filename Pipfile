@@ -27,3 +27,10 @@ pytest-cov = "*"
 
 [requires]
 python_version = "3.13.5"
+
+[scripts]
+update_dep = "python update_dependencies.py"
+server = "python manage.py runserver"
+migrations = "python manage.py makemigrations"
+migrate = "python manage.py migrate"
+shell = "python manage.py shell_plus"

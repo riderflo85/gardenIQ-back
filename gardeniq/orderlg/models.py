@@ -83,3 +83,6 @@ class Order(
     def __str__(self) -> str:
         is_enabled = super(ProtectedDisabledMixinModel, self).__str__()
         return f"{self.name} {is_enabled}"
+
+    def prepopulated_slug(self) -> str:
+        return self.name

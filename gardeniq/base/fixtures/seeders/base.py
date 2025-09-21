@@ -5,12 +5,12 @@ from typing import Callable
 from django.db.models import Model
 
 from rest_framework.parsers import JSONParser
-from rest_framework.serializers import ModelSerializer
+from rest_framework.serializers import Serializer
 
 
 class BaseSeeder:
     model: type[Model]
-    serializer: type[ModelSerializer]
+    serializer: type[Serializer]
     filename: str
     root_dir_source: Path
     # It's use to search object in database for update it
@@ -23,7 +23,7 @@ class BaseSeeder:
         self, success_logger: Callable[[object], str | Any], error_logger: Callable[[object], str | Any]
     ) -> None:
         """Check if class attributs is set by children."""
-        assert issubclass(self.serializer, ModelSerializer)
+        assert issubclass(self.serializer, Serializer)
         assert issubclass(self.model, Model)
         assert isinstance(self.root_dir_source, Path)
         assert isinstance(self.filename, str)

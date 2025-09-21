@@ -1,9 +1,13 @@
 from typing import Optional
 
 from django.db import models
+from django.utils.text import slugify
 
 from gardeniq.base.exceptions import DeleteProtectedException
 from gardeniq.base.exceptions import DisabledProtectedException
+
+from .custom_managers import DisabledManager
+from .custom_managers import EnabledManager
 
 
 class SlugMixinModel(models.Model):
@@ -15,6 +19,24 @@ class SlugMixinModel(models.Model):
 
     class Meta:
         abstract = True
+
+    def save(self, *args, **kwargs):
+        """Override the `save` method to prepopulated slug field."""
+        if self.slug in ("", None):
+            self.slug = self.generate_slug(self.prepopulated_slug())
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def generate_slug(value: str) -> str:
+        """Generate a slug value with field value."""
+        return slugify(value)
+
+    def prepopulated_slug(self) -> str:
+        """
+        Generate a slug value with model instance attributes.
+        Must be overridden by each model.
+        """
+        raise NotImplementedError
 
 
 class DescriptionMixinModel(models.Model):
@@ -72,6 +94,14 @@ class ProtectedDisabledMixinModel(ProtectedRelationsMixinModel):
         verbose_name="is enabled",
         help_text="Designate whether this object is enabled and will show up in searches by default.",
     )
+
+    # Must be declared fisrt.
+    # It's the default manager
+    objects = models.Manager()
+
+    # Custom managers
+    enabled = EnabledManager()
+    disabled = DisabledManager()
 
     class Meta:
         abstract = True

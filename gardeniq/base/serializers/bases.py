@@ -4,7 +4,7 @@ from django.db.models import Model
 
 from rest_framework import serializers
 
-from . import PKMixinSerializer
+from .mixins import PKMixinSerializer
 
 
 class BaseSerializer(PKMixinSerializer):

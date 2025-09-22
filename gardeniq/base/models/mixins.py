@@ -118,8 +118,13 @@ class ProtectedDisabledMixinModel(ProtectedRelationsMixinModel):
         self.is_enabled = False
         self.save()
 
-    def __str__(self) -> str:
-        return f":is enable: {self.is_enabled}"
+    def if_enabled(self) -> str:
+        """
+        Return the string "enabled" if the object is enabled, else "disabled".
+
+        :return: str
+        """
+        return "enabled" if self.is_enabled else "disabled"
 
 
 class ProtectedDeletedMixinModel(ProtectedRelationsMixinModel):

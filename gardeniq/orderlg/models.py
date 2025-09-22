@@ -44,8 +44,7 @@ class Argument(
     )
 
     def __str__(self) -> str:
-        is_enabled = super(ProtectedDisabledMixinModel, self).__str__()
-        return f"{self.slug} {is_enabled}"
+        return f"Argument `{self.slug}` {self.if_enabled()}"
 
 
 class Order(
@@ -81,8 +80,7 @@ class Order(
     )
 
     def __str__(self) -> str:
-        is_enabled = super(ProtectedDisabledMixinModel, self).__str__()
-        return f"{self.name} {is_enabled}"
+        return f"Order `{self.name}` {self.if_enabled()}"
 
     def prepopulated_slug(self) -> str:
         return self.name

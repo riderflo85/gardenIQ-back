@@ -13,6 +13,7 @@ class SeedersManager:
 
     def __init__(self):
         self.seeders_cls = []
+        self.available_apps: set[str] = set()
 
     @staticmethod
     def _build_potential_seeder_name(app_name: str, container: List) -> None:
@@ -39,6 +40,7 @@ class SeedersManager:
             seeder_klass = getattr(module_obj, p_seeder_name, False)
             if seeder_klass:
                 self.seeders_cls.append(seeder_klass)
+        self.available_apps.add(app_name)
         return True
 
     def collect_all(self) -> None:

@@ -27,6 +27,23 @@ class ArgumentSerializer(
         model = Argument
 
 
+class ArgumentReadOnlySerializer(ReadOnlySerializer, ArgumentSerializer):
+    """
+    Note:
+        Using a read-only serializer improves performance,
+        as it avoids checks and processing related to data validation and modification.
+    Serializer for read-only representation of Argument instances.
+
+    Inherits from:
+        ReadOnlySerializer: Provides read-only serialization behavior.
+        ArgumentSerializer: Base serializer for Argument model.
+
+    This serializer is intended for use cases where Argument data should be exposed
+    in a read-only format, preventing any modifications through the API.
+    """
+    pass
+
+
 class OrderSerializer(
     BaseSerializer,
     NameMixinSerializer,

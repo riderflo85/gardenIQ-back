@@ -15,8 +15,16 @@ Including another URLconf
 """
 
 from django.contrib import admin
+from django.urls import include
 from django.urls import path
+
+from gardeniq.orderlg import api_urls as orderlg_api_urls
+
+api_urlpatterns = [
+    path("", include(orderlg_api_urls)),
+]
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/", include(api_urlpatterns)),
 ]

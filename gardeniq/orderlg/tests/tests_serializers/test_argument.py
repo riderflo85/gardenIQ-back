@@ -1,6 +1,7 @@
 import pytest
 
 from gardeniq.orderlg.models import Argument
+from gardeniq.orderlg.serializers import ArgumentReadOnlySerializer
 from gardeniq.orderlg.serializers import ArgumentSerializer
 
 
@@ -98,3 +99,70 @@ class TestArgumentSerializer:
         assert ser.errors
         assert "value_type" in ser.errors
         assert "slug" in ser.errors
+
+
+@pytest.mark.django_db
+class TestArgumentReadOnlySerializer:
+    def test_cannot_create_argument(self):
+        # GIVEN
+        argument_count_before = Argument.objects.count()
+        data = {
+            "description": "my description, blabla",
+            "slug": "my-description-blabla",
+            "value_type": "int",
+        }
+
+        # WHEN
+        ser = ArgumentReadOnlySerializer(data=data)
+        assert ser.is_valid()
+        with pytest.raises(NotImplementedError):
+            ser.save()
+
+        # THEN
+        assert Argument.objects.count() == argument_count_before
+
+    def test_cannot_update_argument(self):
+        # GIVEN
+        data = {
+            "description": "my description, blabla",
+            "slug": "my-description-blabla",
+            "value_type": "int",
+        }
+        argument = Argument.objects.create(**data)
+        updated_data = {
+            "description": "updated description",
+            "slug": "updated-slug",
+            "value_type": "float",
+        }
+
+        # WHEN
+        ser = ArgumentReadOnlySerializer(instance=argument, data=updated_data)
+        assert ser.is_valid()
+        with pytest.raises(NotImplementedError):
+            ser.save()
+
+    def test_serialize_argument(self):
+        # GIVEN
+        data = {
+            "description": "my description, blabla",
+            "slug": "my-description-blabla",
+            "value_type": "int",
+            "required": True,
+            "is_option": False,
+        }
+        argument = Argument.objects.create(**data)
+        expected = {
+            "id": argument.pk,
+            "description": "my description, blabla",
+            "slug": "my-description-blabla",
+            "is_enabled": True,
+            "value_type": "int",
+            "required": True,
+            "is_option": False,
+        }
+
+        # WHEN
+        ser = ArgumentReadOnlySerializer(instance=argument)
+
+        # THEN
+        assert ser.data == expected

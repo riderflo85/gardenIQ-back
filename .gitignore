@@ -133,3 +133,6 @@ dmypy.json
 
 # Other
 docker-compose-usb-override.yml
+
+# Github copilot custom prompts
+.github/prompts

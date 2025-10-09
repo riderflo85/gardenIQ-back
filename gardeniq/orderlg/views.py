@@ -8,13 +8,13 @@ from gardeniq.orderlg.serializers import OrderDetailReadOnlySerializer
 from gardeniq.orderlg.serializers import OrderSerializer
 
 
-class ArgumentModelView(DisableAPIViewMixin, BaseAPIModelViewSet):
+class ArgumentAPIModelView(DisableAPIViewMixin, BaseAPIModelViewSet):
     serializer_class = ArgumentSerializer
     detail_serializer_class = ArgumentReadOnlySerializer
     queryset = Argument.objects.all()
 
 
-class OrderModelView(DisableAPIViewMixin, BaseAPIModelViewSet):
+class OrderAPIModelView(DisableAPIViewMixin, BaseAPIModelViewSet):
     serializer_class = OrderSerializer
     detail_serializer_class = OrderDetailReadOnlySerializer
     queryset = Order.objects.none()

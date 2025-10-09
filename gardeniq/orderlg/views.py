@@ -17,7 +17,7 @@ class ArgumentAPIModelView(DisableAPIViewMixin, BaseAPIModelViewSet):
 class OrderAPIModelView(DisableAPIViewMixin, BaseAPIModelViewSet):
     serializer_class = OrderSerializer
     detail_serializer_class = OrderDetailReadOnlySerializer
-    queryset = Order.objects.none()
+    queryset = Order.objects.all()
 
     def get_queryset(self):
         qs = super().get_queryset()

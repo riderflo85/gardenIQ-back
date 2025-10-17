@@ -9,7 +9,12 @@ DJANGO_APPS = [
     "django.contrib.staticfiles",
 ]
 
-THIRD_PARTY_APPS = ["rest_framework", "django_filters", "corsheaders"]
+THIRD_PARTY_APPS = [
+    "rest_framework",
+    "django_filters",
+    "corsheaders",
+    "drf_spectacular",
+]
 
 LOCAL_APPS = [
     "gardeniq.base",

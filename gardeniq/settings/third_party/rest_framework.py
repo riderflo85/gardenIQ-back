@@ -10,5 +10,6 @@ REST_FRAMEWORK = {
     # ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
     "PAGE_SIZE": 30,  # Set a default limit page.
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     # 'UPLOADED_FILES_USE_URL': False,
 }

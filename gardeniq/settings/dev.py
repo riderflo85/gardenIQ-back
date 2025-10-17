@@ -1,4 +1,5 @@
 from .base import *
+from .third_party.spectacular import *
 
 INSTALLED_APPS += ["django_extensions"]
 

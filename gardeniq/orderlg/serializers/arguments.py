@@ -19,7 +19,7 @@ class ArgumentSerializer(
     SimpleSlugMixinSerializer,
     EnabledMixinSerializer,
 ):
-    value_type = serializers.ChoiceField(choices=Argument.VALUES_CHOICES)
+    value_type = serializers.ChoiceField(choices=Argument.VALUES_TYPE_CHOICES)
     required = serializers.BooleanField(default=True)
     is_option = serializers.BooleanField(default=False)
 

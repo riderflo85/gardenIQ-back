@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.db import models
 
 from gardeniq.base.models import DescriptionMixinModel
@@ -20,17 +22,18 @@ class Argument(
       - `is_enable`
     """
 
-    VALUES_CHOICES = (
+    VALUES_TYPE_CHOICES = (
         ("int", "integer"),
         ("float", "float"),
         ("str", "string"),
         ("bool", "boolean"),
         ("list", "list"),
+        ("none", "none"),
     )
 
     value_type = models.CharField(
         max_length=5,
-        choices=VALUES_CHOICES,
+        choices=VALUES_TYPE_CHOICES,
         verbose_name="value type",
         help_text="A value type of a argument.",
     )
@@ -84,3 +87,17 @@ class Order(
 
     def prepopulated_slug(self) -> str:
         return self.name
+
+    def register_response_data(self, data: Any) -> None:
+        # TODO: register the device response data into log system
+        #   OR database telemetry
+        #   OR SSE system for display data to user dashboard.
+        # e.g: back send `get_temp` order, device response with temp data.
+        pass
+
+    def register_ok_response_state(self) -> None:
+        # TODO: register the device ok response state into log system
+        #   OR database telemetry
+        #   OR SSE system for display response state to user dashboard.
+        # e.g: back send `open_van 1` order, device response without data. Juste state `ok` or `err`.
+        pass

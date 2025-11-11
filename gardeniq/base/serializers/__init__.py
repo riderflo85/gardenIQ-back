@@ -4,4 +4,7 @@ from .mixins import AutocompleteSlugMixinSerializer
 from .mixins import DescriptionMixinSerializer
 from .mixins import EnabledMixinSerializer
 from .mixins import NameMixinSerializer
+from .mixins import OptionalDescriptionMixinSerializer
 from .mixins import SimpleSlugMixinSerializer
+from .status import StatusReadOnlySerializer
+from .status import StatusSerializer

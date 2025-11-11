@@ -46,6 +46,13 @@ class DescriptionMixinModel(models.Model):
         abstract = True
 
 
+class OptionalDescriptionMixinModel(models.Model):
+    description = models.TextField(verbose_name="description", blank=True)
+
+    class Meta:
+        abstract = True
+
+
 class NameMixinModel(models.Model):
     name = models.CharField(
         max_length=255,

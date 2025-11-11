@@ -19,9 +19,11 @@ from django.contrib import admin
 from django.urls import include
 from django.urls import path
 
+from gardeniq.base import api_urls as base_api_urls
 from gardeniq.orderlg import api_urls as orderlg_api_urls
 
 api_urlpatterns = [
+    path("", include(base_api_urls)),
     path("", include(orderlg_api_urls)),
 ]
 

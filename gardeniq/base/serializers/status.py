@@ -17,7 +17,7 @@ class StatusSerializer(
     OptionalDescriptionMixinSerializer,
 ):
     tag = serializers.SlugField()
-    color = serializers.RegexField(color_regex, max_length=7, min_lenght=3, default=Status.DEFAULT_COLOR,)
+    color = serializers.RegexField(color_regex, max_length=7, min_length=3, default=Status.DEFAULT_COLOR,)
 
     class Meta:
         model = Status

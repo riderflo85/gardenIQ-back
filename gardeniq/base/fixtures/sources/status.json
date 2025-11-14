@@ -1,0 +1,14 @@
+[
+    {
+        "id": 1,
+        "name": "En ligne",
+        "color": "#90EE90",
+        "tag": "device"
+    },
+    {
+        "id": 2,
+        "name": "Hors ligne",
+        "color": "#EE9191",
+        "tag": "device"
+    }
+]

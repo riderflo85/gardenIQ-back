@@ -49,6 +49,7 @@ class TestManager:
     def test_import_seeders_with_all_apps(self):
         # GIVEN
         expected_seeders_name = [
+            "StatusSeeder",
             "ArgumentSeeder",
             "OrderSeeder",
         ]
@@ -68,6 +69,7 @@ class TestManager:
         "app_name, expected_seeders_name",
         [
             ("orderlg", ["ArgumentSeeder", "OrderSeeder"]),
+            ("base", ["StatusSeeder"]),
         ],
     )
     def test_import_seeders_with_app_name(self, app_name, expected_seeders_name):

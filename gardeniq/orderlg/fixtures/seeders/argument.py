@@ -8,4 +8,4 @@ class ArgumentSeeder(OrderlgSeeder):
     filename = "arguments.json"
     model = Argument
     serializer = ArgumentSerializer
-    search_field_name = "slug"
+    search_field_name = ["slug"]

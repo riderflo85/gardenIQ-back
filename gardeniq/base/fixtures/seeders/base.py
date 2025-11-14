@@ -16,7 +16,7 @@ class BaseSeeder:
     filename: str
     root_dir_source: Path
     # It's use to search object in database for update it
-    search_field_name: str
+    search_field_name: List[str]
 
     source_file: Path
     dependencies = []
@@ -80,7 +80,8 @@ class BaseSeeder:
             #   Because `search_field_name` is a string, doesn't use .get("field_name"="value") it's not work !
             #   Create a dict {"field_name": "value"} and use `**` to unpack dict.
             try:
-                obj = self.model.objects.get(**{self.search_field_name: d[self.search_field_name]})
+                filters = {f: d[f] for f in self.search_field_name}
+                obj = self.model.objects.get(**filters)
             except self.model.DoesNotExist:
                 self._create_entries([d])
                 continue

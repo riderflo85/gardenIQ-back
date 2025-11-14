@@ -4,6 +4,7 @@ from django.core.management import call_command
 
 import pytest
 
+from gardeniq.base.models import Status
 from gardeniq.orderlg.models import Argument
 from gardeniq.orderlg.models import Order
 
@@ -14,6 +15,7 @@ class TestCommands:
         # GIVEN
         arg_counter_before_seed = Argument.objects.count()
         order_counter_before_seed = Order.objects.count()
+        status_counter_before_seed = Status.objects.count()
         out = StringIO()
 
         # WHEN
@@ -22,11 +24,13 @@ class TestCommands:
         # THEN
         assert Argument.objects.count() > arg_counter_before_seed
         assert Order.objects.count() > order_counter_before_seed
+        assert Status.objects.count() > status_counter_before_seed
 
     @pytest.mark.parametrize(
         "app_name, model_obj",
         [
             ("orderlg", [Argument, Order]),
+            ("base", [Status])
         ],
     )
     def test_seed_with_app_name(self, app_name, model_obj):

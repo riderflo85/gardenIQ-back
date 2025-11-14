@@ -8,7 +8,7 @@ class OrderSeeder(OrderlgSeeder):
     filename = "orders.json"
     model = Order
     serializer = OrderSerializer
-    search_field_name = "slug"
+    search_field_name = ["slug"]
     dependencies = [
         "ArgumentSeeder",
     ]

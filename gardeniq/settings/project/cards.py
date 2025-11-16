@@ -1,6 +1,12 @@
 import re
 from enum import Enum
 
+__all__ = [
+    "BAUDRATE",
+    "LD_FORMATS",
+    "PATTERN_SERIAL_PORT",
+]
+
 
 class ListDevicesFormat(Enum):
     STR = "str"

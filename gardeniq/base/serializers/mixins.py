@@ -16,7 +16,7 @@ class DescriptionMixinSerializer(serializers.Serializer):
 
 
 class OptionalDescriptionMixinSerializer(serializers.Serializer):
-    description = serializers.CharField(required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
 
 
 class SimpleSlugMixinSerializer(serializers.Serializer):

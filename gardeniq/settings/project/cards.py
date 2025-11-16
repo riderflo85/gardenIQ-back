@@ -1,3 +1,4 @@
+import re
 from enum import Enum
 
 
@@ -12,3 +13,5 @@ BAUDRATE = 9600
 
 # Register ListDevicesFormat class in a contante to call this class with django.conf.settings
 LD_FORMATS = ListDevicesFormat
+
+PATTERN_SERIAL_PORT = re.compile(r"^(\/dev\/(tty(S|USB|ACM)[0-9]+|cu\.[\w\-\.]+)|COM[0-9]+)$")

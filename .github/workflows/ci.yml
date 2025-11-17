@@ -13,6 +13,8 @@ jobs:
       DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
       SQL_ENGINE: ${{ secrets.SQL_ENGINE }}
       SQL_NAME: ${{ secrets.SQL_NAME }}
+      MICROPYTHON_REPOT: ${{ secrets.MICROPYTHON_REPOT }}
+      GARDENIQ_FIRMWARE_REPOT: ${{ secrets.GARDENIQ_FIRMWARE_REPOT }}
 
     steps:
       # 1. Get code

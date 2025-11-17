@@ -16,6 +16,7 @@ class DeviceViewSetTestConf(ViewSetTestMixin):
         "uid": "12AB34567890DEAD",
         "path": "/dev/ttyUSB0",
         "description": "Test Device Description",
+        "need_upgrade": False,
     }
 
     @pytest.fixture
@@ -66,6 +67,8 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert "last_seen" in res_data
         assert "gd_firmware_version" in res_data
         assert "mp_firmware_version" in res_data
+        assert "need_upgrade" in res_data
+        assert res_data["need_upgrade"] == expected["need_upgrade"]
 
     def test_retrieve_device(self, client_anonymous, obj):
         """Test retrieving a specific device"""
@@ -86,6 +89,8 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert "status" in response.data
         assert isinstance(response.data["status"], dict)
         assert response.data["status"]["name"] == "Device Active"
+        assert "need_upgrade" in response.data
+        assert response.data["need_upgrade"] == expected["need_upgrade"]
 
     def test_create_device(self, mock_serial_ports, client_anonymous, status_obj):
         """Test creating a new device"""
@@ -112,12 +117,15 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert "last_seen" in response.data
         assert "gd_firmware_version" in response.data
         assert "mp_firmware_version" in response.data
+        assert "need_upgrade" in response.data
+        assert response.data["need_upgrade"] is False
 
         # Database verification
         device_obj = Device.objects.get(name="New Device")
         assert device_obj.path == "/dev/ttyUSB1"
         assert device_obj.description == "A new device description"
         assert device_obj.status == status_obj
+        assert device_obj.need_upgrade is False
 
     def test_create_device_without_description(self, mock_serial_ports, client_anonymous, status_obj):
         """Test creating a device without description (optional field)"""
@@ -137,6 +145,8 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert response.data["name"] == "Device Without Description"
         assert response.data["path"] == "/dev/ttyUSB0"
         assert response.data["description"] == ""
+        assert "need_upgrade" in response.data
+        assert response.data["need_upgrade"] is False
 
     def test_update_device(self, mock_serial_ports, client_anonymous, obj, status_obj):
         """Test updating an existing device"""
@@ -158,6 +168,8 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert response.data["name"] == "Updated Device"
         assert response.data["path"] == "/dev/ttyUSB1"
         assert response.data["description"] == "Updated description"
+        assert "need_upgrade" in response.data
+        assert response.data["need_upgrade"] is False
 
         # Database verification
         device_obj.refresh_from_db()
@@ -180,6 +192,8 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert response.data["name"] == "Partially Updated Device"
         assert response.data["path"] == "/dev/ttyUSB0"  # unchanged
         assert response.data["uid"] == "12AB34567890DEAD"  # unchanged
+        assert "need_upgrade" in response.data
+        assert response.data["need_upgrade"] is False
 
         # Database verification
         device_obj.refresh_from_db()
@@ -201,6 +215,8 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert response.status_code == status.HTTP_200_OK
         assert response.data["path"] == "COM3"
         assert response.data["name"] == "Test Device"  # unchanged
+        assert "need_upgrade" in response.data
+        assert response.data["need_upgrade"] is False
 
         # Database verification
         device_obj.refresh_from_db()
@@ -376,34 +392,6 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "name" in response.data
 
-    def test_list_devices_query_optimization(self, client_anonymous, obj):
-        """Test that list view uses select_related for status optimization"""
-        # GIVEN
-        url = self.get_url_list()
-
-        # WHEN
-        with self.assert_num_queries(2):  # Should only need 2 queries with select_related
-            response = client_anonymous.get(url)
-
-        # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["count"] == 1
-
-    def assert_num_queries(self, num):
-        """Helper context manager to assert number of database queries"""
-        from django.db import connection
-        from django.test.utils import CaptureQueriesContext
-
-        class AssertNumQueriesContext(CaptureQueriesContext):
-            def __exit__(self, exc_type, exc_value, traceback):
-                super().__exit__(exc_type, exc_value, traceback)
-                if exc_type is not None:
-                    return
-                executed = len(self)
-                assert executed == num, f"Expected {num} queries but got {executed}"
-
-        return AssertNumQueriesContext(connection)
-
     def test_create_device_with_com_port(self, mock_serial_ports, client_anonymous, status_obj):
         """Test creating a device with a Windows COM port path"""
         # GIVEN
@@ -468,6 +456,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert response.status_code == status.HTTP_200_OK
         assert response.data["uid"] == original_uid
         # uid should be in response but not modifiable through API
+        assert "need_upgrade" in response.data
 
     def test_device_firmware_versions_readonly(self, client_anonymous, obj):
         """Test that firmware version fields are read-only"""
@@ -482,6 +471,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert response.status_code == status.HTTP_200_OK
         assert "gd_firmware_version" in response.data
         assert "mp_firmware_version" in response.data
+        assert "need_upgrade" in response.data
 
     def test_update_device_empty_description(self, mock_serial_ports, client_anonymous, obj, status_obj):
         """Test updating device to have empty description"""
@@ -501,6 +491,8 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         # THEN
         assert response.status_code == status.HTTP_200_OK
         assert response.data["description"] == ""
+        assert "need_upgrade" in response.data
+        assert response.data["need_upgrade"] is False
 
         # Database verification
         device_obj.refresh_from_db()

@@ -1,16 +1,12 @@
 import logging
 
-from gardeniq.hardware.models import Device  # type: ignore # TODO: remove this comment after create Device model !
+from gardeniq.hardware.models import Device
 
 from ..errors import CommandError
 from ..errors import FrameProcessingError
 from ..frame import Frame
 
 logger = logging.getLogger(__name__)
-
-# TODO: Implement Device model with methods :
-#   mark_online
-#   update_firmware_version -> this method should check device need update or not and store this boolean value !
 
 
 class FrameHandler:
@@ -95,7 +91,7 @@ class FrameHandler:
         device.mark_online()
 
         if frame.gd_fw_version and frame.mp_fw_version:
-            device.update_firmware_versions(garden_fw=frame.gd_fw_version, micropython_fw=frame.mp_fw_version)
+            device.set_firmware_versions(frame.gd_fw_version, frame.mp_fw_version)
 
     def _handle_response_with_data(self, frame: Frame) -> None:
         # TODO: register the device response data into log system

@@ -26,6 +26,7 @@ class DeviceSerializer(BaseSerializer, NameMixinSerializer, OptionalDescriptionM
     status = serializers.PrimaryKeyRelatedField(queryset=Status.objects.all(), many=False)
     gd_firmware_version = serializers.CharField(read_only=True)
     mp_firmware_version = serializers.CharField(read_only=True)
+    need_upgrade = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Device

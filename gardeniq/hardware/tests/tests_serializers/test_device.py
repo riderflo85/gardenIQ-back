@@ -184,6 +184,7 @@ class TestDeviceSerializer:
         # Firmware versions should be empty (read-only fields)
         assert device.gd_firmware_version == ""  # type: ignore
         assert device.mp_firmware_version == ""  # type: ignore
+        assert device.need_upgrade is False  # type: ignore
 
     def test_errors_missing_required_fields(self, mock_serial_ports):
         # GIVEN
@@ -334,6 +335,7 @@ class TestDeviceDetailReadOnlySerializer:
             "status": expected_status,
             "gd_firmware_version": "1.2.3",
             "mp_firmware_version": "1.21.0",
+            "need_upgrade": False,
         }
 
         # WHEN
@@ -368,6 +370,7 @@ class TestDeviceDetailReadOnlySerializer:
             },
             "gd_firmware_version": "",
             "mp_firmware_version": "",
+            "need_upgrade": False,
         }
 
         # WHEN

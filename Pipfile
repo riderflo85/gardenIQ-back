@@ -12,6 +12,7 @@ django-cors-headers = "*"
 django-extensions = "*"
 pyserial = "*"
 requests = "*"
+tzdata = "*"
 
 [dev-packages]
 pytest = "*"

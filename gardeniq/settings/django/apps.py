@@ -21,6 +21,7 @@ LOCAL_APPS = [
     "gardeniq.orderlg",
     "gardeniq.telemetry",
     "gardeniq.hardware",
+    "gardeniq.users",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

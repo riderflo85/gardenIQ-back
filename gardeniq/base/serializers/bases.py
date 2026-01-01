@@ -50,3 +50,11 @@ class ReadOnlySerializer(serializers.Serializer):
         Raises NotImplementedError because this read-only serializer does not update objects.
         """
         raise NotImplementedError(f"{self.__class__.__name__} is read-only and cannot update objects.")
+
+    def save(self, **kwargs):
+        """
+        Override save to prevent saving.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} is read-only and cannot save objects."
+        )

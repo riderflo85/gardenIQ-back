@@ -1,451 +1,843 @@
-from django.test import TestCase
+"""
+Tests for User serializers.
+
+Tests cover UserSerializer and UserReadOnlySerializer with all validation scenarios.
+Uses pytest and the GIVEN-WHEN-THEN pattern for clarity.
+"""
+import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
-from rest_framework import serializers
+from django.test import RequestFactory
 
-from gardeniq.users.serializers.users import UserSerializer, UserReadOnlySerializer
+from gardeniq.users.serializers.users import (
+    UserSerializer,
+    UserReadOnlySerializer,
+    UserDetailReadOnlySerializer
+)
 
 User = get_user_model()
 
 
-class UserSerializerTestCase(TestCase):
-    """Test cases for UserSerializer"""
+# Fixtures
+@pytest.fixture
+def mock_request_factory():
+    """
+    Factory fixture to create mock Django request objects with authenticated users.
 
-    def setUp(self):
-        """Set up test data"""
-        self.content_type = ContentType.objects.get_for_model(User)
+    Returns a callable that accepts a user and returns a mock request with that user.
+    """
+    def _create_request(user):
+        """Create a mock request with the given user."""
+        factory = RequestFactory()
+        request = factory.get('/')
+        request.user = user
+        return request
+    return _create_request
 
-        # Create test permissions
-        self.permission1 = Permission.objects.create(
-            codename='test_permission1',
-            name='Test Permission 1',
-            content_type=self.content_type
-        )
-        self.permission2 = Permission.objects.create(
-            codename='test_permission2',
-            name='Test Permission 2',
-            content_type=self.content_type
-        )
 
-        # Create test groups
-        self.group1 = Group.objects.create(name='Test Group 1')
-        self.group1.permissions.add(self.permission1)
+@pytest.fixture
+def user_content_type():
+    """Return the content type for User model."""
+    return ContentType.objects.get_for_model(User)
 
-        self.group2 = Group.objects.create(name='Test Group 2')
-        self.group2.permissions.add(self.permission2)
 
-        # Create test user
-        self.user = User.objects.create_user(
-            username='testuser',
-            email='testuser@example.com',
-            password='testpass123',
-            first_name='Test',
-            last_name='User'
-        )
-        self.user.groups.add(self.group1)
-        self.user.user_permissions.add(self.permission1)
+@pytest.fixture
+def test_permission(user_content_type):
+    """Create a test permission."""
+    return Permission.objects.create(
+        codename='test_permission',
+        name='Test Permission',
+        content_type=user_content_type
+    )
 
-    def test_create_user_with_required_fields(self):
-        """Test creating a user with required fields"""
+
+@pytest.fixture
+def test_permission_2(user_content_type):
+    """Create a second test permission."""
+    return Permission.objects.create(
+        codename='test_permission_2',
+        name='Test Permission 2',
+        content_type=user_content_type
+    )
+
+
+@pytest.fixture
+def test_group(test_permission):
+    """Create a test group with permissions."""
+    group = Group.objects.create(name='Test Group')
+    group.permissions.add(test_permission)
+    return group
+
+
+@pytest.fixture
+def test_group_2(test_permission_2):
+    """Create a second test group with permissions."""
+    group = Group.objects.create(name='Test Group 2')
+    group.permissions.add(test_permission_2)
+    return group
+
+
+@pytest.fixture
+def regular_user():
+    """Create a regular non-staff user."""
+    return User.objects.create_user(
+        username='regularuser',
+        email='regular@example.com',
+        password='RegularPass123!'
+    )
+
+
+@pytest.fixture
+def admin_user():
+    """Create an admin user with staff privileges."""
+    return User.objects.create_user(
+        username='adminuser',
+        email='admin@example.com',
+        password='AdminPass123!',
+        is_staff=True,
+        is_superuser=True
+    )
+
+
+@pytest.fixture
+def regular_user_with_groups(regular_user, test_group, test_permission):
+    """Create a regular user with groups and permissions."""
+    regular_user.groups.add(test_group)
+    regular_user.user_permissions.add(test_permission)
+    return regular_user
+
+
+@pytest.mark.django_db
+class TestUserSerializerCreate:
+    """Tests for creating users with UserSerializer."""
+
+    def test_create_user_with_required_fields(self, mock_request_factory, admin_user):
+        """Test creating a user with only required fields."""
+        # GIVEN
+        # Valid user data with minimum requirements
         data = {
             'username': 'newuser',
-            'password': 'newpass123'
+            'password': 'NewPass123!',
+            'password_confirm': 'NewPass123!'
         }
-        serializer = UserSerializer(data=data)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
+        mock_request = mock_request_factory(admin_user)
+        serializer = UserSerializer(data=data, context={'request': mock_request})
+
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert is_valid, serializer.errors
         user = serializer.save()
+        assert user.username == 'newuser'
+        assert user.check_password('NewPass123!')
 
-        self.assertEqual(user.username, 'newuser')
-        self.assertTrue(user.check_password('newpass123'))
-
-    def test_create_user_with_all_fields(self):
-        """Test creating a user with all fields"""
+    def test_create_user_with_all_fields(
+        self, mock_request_factory, admin_user, test_group, test_group_2,
+        test_permission, test_permission_2
+    ):
+        """Test creating a user with all fields."""
+        # GIVEN
+        # Complete user data
         data = {
             'username': 'fulluser',
-            'password': 'fullpass123',
+            'password': 'FullPass123!',
+            'password_confirm': 'FullPass123!',
             'email': 'fulluser@example.com',
             'first_name': 'Full',
             'last_name': 'User',
-            'group_ids': [self.group1.id, self.group2.id],
-            'permission_ids': [self.permission1.id, self.permission2.id]
+            'group_ids': [test_group.id, test_group_2.id],
+            'permission_ids': [test_permission.id, test_permission_2.id]
         }
-        serializer = UserSerializer(data=data)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
+        mock_request = mock_request_factory(admin_user)
+        serializer = UserSerializer(data=data, context={'request': mock_request})
+
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert is_valid, serializer.errors
         user = serializer.save()
+        assert user.username == 'fulluser'
+        assert user.email == 'fulluser@example.com'
+        assert user.first_name == 'Full'
+        assert user.last_name == 'User'
+        assert user.check_password('FullPass123!')
+        assert user.groups.count() == 2
+        assert test_group in user.groups.all()
+        assert test_group_2 in user.groups.all()
+        assert user.user_permissions.count() == 2
 
-        self.assertEqual(user.username, 'fulluser')
-        self.assertEqual(user.email, 'fulluser@example.com')
-        self.assertEqual(user.first_name, 'Full')
-        self.assertEqual(user.last_name, 'User')
-        self.assertTrue(user.check_password('fullpass123'))
-        self.assertEqual(user.groups.count(), 2)
-        self.assertIn(self.group1, user.groups.all())
-        self.assertIn(self.group2, user.groups.all())
-        self.assertEqual(user.user_permissions.count(), 2)
-
-    def test_create_user_without_password_fails(self):
-        """Test that creating a user without password fails"""
+    def test_create_user_without_password_fails(self, mock_request_factory, admin_user):
+        """Test that creating user without password fails."""
+        # GIVEN
+        # User data missing password
         data = {
             'username': 'nopassuser'
         }
-        serializer = UserSerializer(data=data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('password', serializer.errors)
+        mock_request = mock_request_factory(admin_user)
+        serializer = UserSerializer(data=data, context={'request': mock_request})
 
-    def test_create_user_without_username_fails(self):
-        """Test that creating a user without username fails"""
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert not is_valid
+        assert 'password' in serializer.errors
+
+    def test_create_user_without_password_confirm_fails(
+        self, mock_request_factory, admin_user
+    ):
+        """Test that creating user without password confirmation fails."""
+        # GIVEN
+        # User data missing password_confirm
         data = {
-            'password': 'testpass123'
+            'username': 'noconfirmuser',
+            'password': 'TestPass123!'
         }
-        serializer = UserSerializer(data=data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('username', serializer.errors)
+        mock_request = mock_request_factory(admin_user)
+        serializer = UserSerializer(data=data, context={'request': mock_request})
 
-    def test_create_user_with_short_password_fails(self):
-        """Test that creating a user with short password fails"""
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert not is_valid
+        assert 'password_confirm' in serializer.errors
+
+    def test_create_user_without_username_fails(self, mock_request_factory, admin_user):
+        """Test that creating user without username fails."""
+        # GIVEN
+        # User data missing username
+        data = {
+            'password': 'TestPass123!',
+            'password_confirm': 'TestPass123!'
+        }
+        mock_request = mock_request_factory(admin_user)
+        serializer = UserSerializer(data=data, context={'request': mock_request})
+
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert not is_valid
+        assert 'username' in serializer.errors
+
+    def test_create_user_with_mismatched_passwords_fails(
+        self, mock_request_factory, admin_user
+    ):
+        """Test that creating user with mismatched passwords fails."""
+        # GIVEN
+        # Passwords don't match
+        data = {
+            'username': 'mismatchuser',
+            'password': 'Password123!',
+            'password_confirm': 'DifferentPass123!'
+        }
+        mock_request = mock_request_factory(admin_user)
+        serializer = UserSerializer(data=data, context={'request': mock_request})
+
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert not is_valid
+        assert 'password_confirm' in serializer.errors
+
+    def test_create_user_with_short_password_fails(self, mock_request_factory, admin_user):
+        """Test that creating user with short password fails."""
+        # GIVEN
+        # Password too short
         data = {
             'username': 'shortpass',
-            'password': 'short'
+            'password': 'short',
+            'password_confirm': 'short'
         }
-        serializer = UserSerializer(data=data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('password', serializer.errors)
+        mock_request = mock_request_factory(admin_user)
+        serializer = UserSerializer(data=data, context={'request': mock_request})
 
-    def test_create_user_with_blank_username_fails(self):
-        """Test that creating a user with blank username fails"""
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert not is_valid
+        assert 'password' in serializer.errors
+
+    def test_create_user_with_blank_username_fails(self, mock_request_factory, admin_user):
+        """Test that creating user with blank username fails."""
+        # GIVEN
+        # Blank username
         data = {
             'username': '',
-            'password': 'testpass123'
+            'password': 'TestPass123!',
+            'password_confirm': 'TestPass123!'
         }
-        serializer = UserSerializer(data=data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('username', serializer.errors)
+        mock_request = mock_request_factory(admin_user)
+        serializer = UserSerializer(data=data, context={'request': mock_request})
 
-    def test_create_user_with_duplicate_username_fails(self):
-        """Test that creating a user with duplicate username fails"""
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert not is_valid
+        assert 'username' in serializer.errors
+
+    def test_create_user_with_duplicate_username_fails(
+        self, mock_request_factory, admin_user, regular_user
+    ):
+        """Test that creating user with duplicate username fails."""
+        # GIVEN
+        # Username already exists
         data = {
-            'username': 'testuser',  # Already exists
-            'password': 'testpass123'
+            'username': regular_user.username,
+            'password': 'TestPass123!',
+            'password_confirm': 'TestPass123!'
         }
-        serializer = UserSerializer(data=data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('username', serializer.errors)
+        mock_request = mock_request_factory(admin_user)
+        serializer = UserSerializer(data=data, context={'request': mock_request})
 
-    def test_create_user_with_duplicate_email_fails(self):
-        """Test that creating a user with duplicate email fails"""
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert not is_valid
+        assert 'username' in serializer.errors
+
+    def test_create_user_with_duplicate_email_fails(
+        self, mock_request_factory, admin_user, regular_user
+    ):
+        """Test that creating user with duplicate email fails."""
+        # GIVEN
+        # Email already exists
         data = {
             'username': 'newuser',
-            'email': 'testuser@example.com',  # Already exists
-            'password': 'testpass123'
+            'email': regular_user.email,
+            'password': 'TestPass123!',
+            'password_confirm': 'TestPass123!'
         }
-        serializer = UserSerializer(data=data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('email', serializer.errors)
+        mock_request = mock_request_factory(admin_user)
+        serializer = UserSerializer(data=data, context={'request': mock_request})
 
-    def test_create_user_with_empty_email(self):
-        """Test that creating a user with empty email is allowed"""
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert not is_valid
+        assert 'email' in serializer.errors
+
+    def test_create_user_with_empty_email_succeeds(
+        self, mock_request_factory, admin_user
+    ):
+        """Test that creating user with empty email is allowed."""
+        # GIVEN
+        # Empty email (optional field)
         data = {
             'username': 'noemail',
-            'password': 'testpass123',
+            'password': 'TestPass123!',
+            'password_confirm': 'TestPass123!',
             'email': ''
         }
-        serializer = UserSerializer(data=data)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
-        user = serializer.save()
-        self.assertEqual(user.email, '')
+        mock_request = mock_request_factory(admin_user)
+        serializer = UserSerializer(data=data, context={'request': mock_request})
 
-    def test_update_user_basic_fields(self):
-        """Test updating user basic fields"""
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert is_valid, serializer.errors
+        user = serializer.save()
+        assert user.email == ''
+
+    def test_create_user_with_invalid_email_fails(self, mock_request_factory, admin_user):
+        """Test that creating user with invalid email fails."""
+        # GIVEN
+        # Invalid email format
+        data = {
+            'username': 'bademail',
+            'email': 'not-an-email',
+            'password': 'TestPass123!',
+            'password_confirm': 'TestPass123!'
+        }
+        mock_request = mock_request_factory(admin_user)
+        serializer = UserSerializer(data=data, context={'request': mock_request})
+
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert not is_valid
+        assert 'email' in serializer.errors
+
+
+@pytest.mark.django_db
+class TestUserSerializerUpdate:
+    """Tests for updating users with UserSerializer."""
+
+    def test_update_user_basic_fields(self, mock_request_factory, regular_user):
+        """Test updating user basic fields."""
+        # GIVEN
+        # Existing user and update data
         data = {
             'first_name': 'Updated',
             'last_name': 'Name',
             'email': 'updated@example.com'
         }
-        serializer = UserSerializer(instance=self.user, data=data, partial=True)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
+        mock_request = mock_request_factory(regular_user)
+        serializer = UserSerializer(
+            instance=regular_user,
+            data=data,
+            partial=True,
+            context={'request': mock_request}
+        )
+
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert is_valid, serializer.errors
         user = serializer.save()
+        assert user.first_name == 'Updated'
+        assert user.last_name == 'Name'
+        assert user.email == 'updated@example.com'
 
-        self.assertEqual(user.first_name, 'Updated')
-        self.assertEqual(user.last_name, 'Name')
-        self.assertEqual(user.email, 'updated@example.com')
-
-    def test_update_user_password(self):
-        """Test updating user password"""
-        old_password = self.user.password
+    def test_update_user_password(self, mock_request_factory, regular_user):
+        """Test updating user password."""
+        # GIVEN
+        # User and new password
+        old_password_hash = regular_user.password
         data = {
-            'password': 'newpassword123'
+            'password': 'NewPassword123!',
+            'password_confirm': 'NewPassword123!'
         }
-        serializer = UserSerializer(instance=self.user, data=data, partial=True)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
+        mock_request = mock_request_factory(regular_user)
+        serializer = UserSerializer(
+            instance=regular_user,
+            data=data,
+            partial=True,
+            context={'request': mock_request}
+        )
+
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert is_valid, serializer.errors
         user = serializer.save()
+        assert user.password != old_password_hash
+        assert user.check_password('NewPassword123!')
 
-        self.assertNotEqual(user.password, old_password)
-        self.assertTrue(user.check_password('newpassword123'))
-
-    def test_update_user_username(self):
-        """Test updating user username"""
+    def test_update_user_username(self, mock_request_factory, regular_user):
+        """Test updating user username."""
+        # GIVEN
+        # New username
         data = {
             'username': 'updatedusername'
         }
-        serializer = UserSerializer(instance=self.user, data=data, partial=True)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
-        user = serializer.save()
-
-        self.assertEqual(user.username, 'updatedusername')
-
-    def test_update_user_with_duplicate_username_fails(self):
-        """Test that updating user with duplicate username fails"""
-        other_user = User.objects.create_user(
-            username='otheruser',
-            password='testpass123'
+        mock_request = mock_request_factory(regular_user)
+        serializer = UserSerializer(
+            instance=regular_user,
+            data=data,
+            partial=True,
+            context={'request': mock_request}
         )
 
-        data = {
-            'username': 'otheruser'
-        }
-        serializer = UserSerializer(instance=self.user, data=data, partial=True)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('username', serializer.errors)
+        # WHEN
+        is_valid = serializer.is_valid()
 
-    def test_update_user_with_duplicate_email_fails(self):
-        """Test that updating user with duplicate email fails"""
-        other_user = User.objects.create_user(
-            username='otheruser',
-            email='other@example.com',
-            password='testpass123'
+        # THEN
+        assert is_valid, serializer.errors
+        user = serializer.save()
+        assert user.username == 'updatedusername'
+
+    def test_update_user_with_duplicate_username_fails(
+        self, mock_request_factory, regular_user, admin_user
+    ):
+        """Test that updating to duplicate username fails."""
+        # GIVEN
+        # Trying to use another user's username
+        data = {
+            'username': admin_user.username
+        }
+        mock_request = mock_request_factory(regular_user)
+        serializer = UserSerializer(
+            instance=regular_user,
+            data=data,
+            partial=True,
+            context={'request': mock_request}
         )
 
-        data = {
-            'email': 'other@example.com'
-        }
-        serializer = UserSerializer(instance=self.user, data=data, partial=True)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('email', serializer.errors)
+        # WHEN
+        is_valid = serializer.is_valid()
 
-    def test_update_user_with_same_username_succeeds(self):
-        """Test that updating user with same username succeeds"""
+        # THEN
+        assert not is_valid
+        assert 'username' in serializer.errors
+
+    def test_update_user_with_duplicate_email_fails(
+        self, mock_request_factory, regular_user, admin_user
+    ):
+        """Test that updating to duplicate email fails."""
+        # GIVEN
+        # Trying to use another user's email
         data = {
-            'username': 'testuser',
+            'email': admin_user.email
+        }
+        mock_request = mock_request_factory(regular_user)
+        serializer = UserSerializer(
+            instance=regular_user,
+            data=data,
+            partial=True,
+            context={'request': mock_request}
+        )
+
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert not is_valid
+        assert 'email' in serializer.errors
+
+    def test_update_user_with_same_username_succeeds(
+        self, mock_request_factory, regular_user
+    ):
+        """Test that updating with same username succeeds."""
+        # GIVEN
+        # Same username, different field
+        data = {
+            'username': regular_user.username,
             'first_name': 'Updated'
         }
-        serializer = UserSerializer(instance=self.user, data=data, partial=True)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
+        mock_request = mock_request_factory(regular_user)
+        serializer = UserSerializer(
+            instance=regular_user,
+            data=data,
+            partial=True,
+            context={'request': mock_request}
+        )
 
-    def test_update_user_with_same_email_succeeds(self):
-        """Test that updating user with same email succeeds"""
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert is_valid, serializer.errors
+
+    def test_update_user_with_same_email_succeeds(
+        self, mock_request_factory, regular_user
+    ):
+        """Test that updating with same email succeeds."""
+        # GIVEN
+        # Same email, different field
         data = {
-            'email': 'testuser@example.com',
+            'email': regular_user.email,
             'first_name': 'Updated'
         }
-        serializer = UserSerializer(instance=self.user, data=data, partial=True)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
+        mock_request = mock_request_factory(regular_user)
+        serializer = UserSerializer(
+            instance=regular_user,
+            data=data,
+            partial=True,
+            context={'request': mock_request}
+        )
 
-    def test_update_user_groups(self):
-        """Test updating user groups"""
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert is_valid, serializer.errors
+
+    def test_update_user_groups_as_admin(
+        self, mock_request_factory, admin_user, regular_user, test_group, test_group_2
+    ):
+        """Test that admin can update user groups."""
+        # GIVEN
+        # Admin updating groups
         data = {
-            'group_ids': [self.group2.id]
+            'group_ids': [test_group.id, test_group_2.id]
         }
-        serializer = UserSerializer(instance=self.user, data=data, partial=True)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
+        mock_request = mock_request_factory(admin_user)
+        serializer = UserSerializer(
+            instance=regular_user,
+            data=data,
+            partial=True,
+            context={'request': mock_request}
+        )
+
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert is_valid, serializer.errors
         user = serializer.save()
+        assert user.groups.count() == 2
+        assert test_group in user.groups.all()
+        assert test_group_2 in user.groups.all()
 
-        self.assertEqual(user.groups.count(), 1)
-        self.assertIn(self.group2, user.groups.all())
-        self.assertNotIn(self.group1, user.groups.all())
-
-    def test_update_user_permissions(self):
-        """Test updating user permissions"""
+    def test_update_user_permissions_as_admin(
+        self, mock_request_factory, admin_user, regular_user, test_permission
+    ):
+        """Test that admin can update user permissions."""
+        # GIVEN
+        # Admin updating permissions
         data = {
-            'permission_ids': [self.permission2.id]
+            'permission_ids': [test_permission.id]
         }
-        serializer = UserSerializer(instance=self.user, data=data, partial=True)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
+        mock_request = mock_request_factory(admin_user)
+        serializer = UserSerializer(
+            instance=regular_user,
+            data=data,
+            partial=True,
+            context={'request': mock_request}
+        )
+
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert is_valid, serializer.errors
         user = serializer.save()
+        assert user.user_permissions.count() == 1
+        assert test_permission in user.user_permissions.all()
 
-        self.assertEqual(user.user_permissions.count(), 1)
-        self.assertIn(self.permission2, user.user_permissions.all())
-
-    def test_update_without_password_required(self):
-        """Test that password is not required for update"""
+    def test_update_without_password_succeeds(self, mock_request_factory, regular_user):
+        """Test that password is not required for update."""
+        # GIVEN
+        # Update without password
         data = {
             'first_name': 'Updated'
         }
-        serializer = UserSerializer(instance=self.user, data=data, partial=True)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
+        mock_request = mock_request_factory(regular_user)
+        serializer = UserSerializer(
+            instance=regular_user,
+            data=data,
+            partial=True,
+            context={'request': mock_request}
+        )
 
-    def test_serializer_fields_readonly(self):
-        """Test that certain fields are read-only"""
-        serializer = UserSerializer(instance=self.user)
+        # WHEN
+        is_valid = serializer.is_valid()
 
-        self.assertTrue(serializer.fields['is_staff'].read_only)
-        self.assertTrue(serializer.fields['is_active'].read_only)
-        self.assertTrue(serializer.fields['last_login'].read_only)
-        self.assertTrue(serializer.fields['date_joined'].read_only)
-        self.assertTrue(serializer.fields['password'].write_only)
+        # THEN
+        assert is_valid, serializer.errors
 
-    def test_serializer_representation(self):
-        """Test serializer representation"""
-        serializer = UserSerializer(instance=self.user)
+    def test_update_password_with_mismatched_confirm_fails(
+        self, mock_request_factory, regular_user
+    ):
+        """Test that updating password with mismatched confirmation fails."""
+        # GIVEN
+        # Mismatched passwords
+        data = {
+            'password': 'NewPassword123!',
+            'password_confirm': 'DifferentPass123!'
+        }
+        mock_request = mock_request_factory(regular_user)
+        serializer = UserSerializer(
+            instance=regular_user,
+            data=data,
+            partial=True,
+            context={'request': mock_request}
+        )
+
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert not is_valid
+        assert 'password_confirm' in serializer.errors
+
+
+@pytest.mark.django_db
+class TestUserSerializerValidation:
+    """Tests for UserSerializer validation and field constraints."""
+
+    def test_group_ids_validation_non_admin_fails(
+        self, mock_request_factory, regular_user, test_group
+    ):
+        """Test that non-admin cannot assign groups."""
+        # GIVEN
+        # Regular user trying to assign groups
+        data = {
+            'group_ids': [test_group.id]
+        }
+        mock_request = mock_request_factory(regular_user)
+        serializer = UserSerializer(
+            instance=regular_user,
+            data=data,
+            partial=True,
+            context={'request': mock_request}
+        )
+
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert not is_valid
+        assert 'group_ids' in serializer.errors
+
+    def test_permission_ids_validation_non_admin_fails(
+        self, mock_request_factory, regular_user, test_permission
+    ):
+        """Test that non-admin cannot assign permissions."""
+        # GIVEN
+        # Regular user trying to assign permissions
+        data = {
+            'permission_ids': [test_permission.id]
+        }
+        mock_request = mock_request_factory(regular_user)
+        serializer = UserSerializer(
+            instance=regular_user,
+            data=data,
+            partial=True,
+            context={'request': mock_request}
+        )
+
+        # WHEN
+        is_valid = serializer.is_valid()
+
+        # THEN
+        assert not is_valid
+        assert 'permission_ids' in serializer.errors
+
+    def test_serializer_representation_excludes_password(
+        self, mock_request_factory, regular_user
+    ):
+        """Test that password is not in serialized output."""
+        # GIVEN
+        # Serializer instance
+        mock_request = mock_request_factory(regular_user)
+        serializer = UserSerializer(instance=regular_user, context={'request': mock_request})
+
+        # WHEN
         data = serializer.data
 
-        self.assertEqual(data['id'], self.user.id)
-        self.assertEqual(data['username'], self.user.username)
-        self.assertEqual(data['email'], self.user.email)
-        self.assertEqual(data['first_name'], self.user.first_name)
-        self.assertEqual(data['last_name'], self.user.last_name)
-        self.assertNotIn('password', data)  # write_only field
+        # THEN
+        assert 'password' not in data
+        assert data['id'] == regular_user.id
+        assert data['username'] == regular_user.username
 
-    def test_partial_update(self):
-        """Test partial update of user"""
+    def test_is_staff_field_is_readonly(self, mock_request_factory, regular_user):
+        """Test that is_staff field is read-only."""
+        # GIVEN
+        # Trying to set is_staff
         data = {
-            'first_name': 'PartialUpdate'
+            'is_staff': True
         }
-        serializer = UserSerializer(instance=self.user, data=data, partial=True)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
+        mock_request = mock_request_factory(regular_user)
+        serializer = UserSerializer(
+            instance=regular_user,
+            data=data,
+            partial=True,
+            context={'request': mock_request}
+        )
+
+        # WHEN
+        is_valid = serializer.is_valid()
         user = serializer.save()
 
-        # Only first_name should change
-        self.assertEqual(user.first_name, 'PartialUpdate')
-        self.assertEqual(user.username, 'testuser')  # Unchanged
-        self.assertEqual(user.email, 'testuser@example.com')  # Unchanged
+        # THEN
+        assert is_valid
+        # is_staff should not have changed
+        assert user.is_staff is False
 
 
-class UserReadOnlySerializerTestCase(TestCase):
-    """Test cases for UserReadOnlySerializer"""
+@pytest.mark.django_db
+class TestUserReadOnlySerializer:
+    """Tests for UserReadOnlySerializer."""
 
-    def setUp(self):
-        """Set up test data"""
-        self.content_type = ContentType.objects.get_for_model(User)
+    def test_readonly_serializer_representation(
+        self, regular_user_with_groups, test_group, test_permission
+    ):
+        """Test that read-only serializer includes all expected fields."""
+        # GIVEN
+        # User with groups and permissions
+        serializer = UserDetailReadOnlySerializer(instance=regular_user_with_groups)
 
-        # Create test permissions
-        self.permission1 = Permission.objects.create(
-            codename='test_ro_permission1',
-            name='Test RO Permission 1',
-            content_type=self.content_type
-        )
-
-        # Create test groups
-        self.group1 = Group.objects.create(name='Test RO Group 1')
-        self.group1.permissions.add(self.permission1)
-
-        # Create test user
-        self.user = User.objects.create_user(
-            username='readonly_user',
-            email='readonly@example.com',
-            password='testpass123',
-            first_name='ReadOnly',
-            last_name='User'
-        )
-        self.user.groups.add(self.group1)
-        self.user.user_permissions.add(self.permission1)
-
-    def test_readonly_serializer_representation(self):
-        """Test that read-only serializer includes groups and permissions"""
-        serializer = UserReadOnlySerializer(instance=self.user)
+        # WHEN
         data = serializer.data
 
-        self.assertEqual(data['id'], self.user.id)
-        self.assertEqual(data['username'], self.user.username)
-        self.assertEqual(data['email'], self.user.email)
+        # THEN
+        assert data['id'] == regular_user_with_groups.id
+        assert data['username'] == regular_user_with_groups.username
+        assert data['email'] == regular_user_with_groups.email
+        assert 'groups' in data
+        assert len(data['groups']) > 0
+        assert any(g['name'] == test_group.name for g in data['groups'])
+        assert 'user_permissions' in data
+        assert len(data['user_permissions']) > 0
 
-        # Check groups are serialized
-        self.assertIn('groups', data)
-        self.assertEqual(len(data['groups']), 1)
-        self.assertEqual(data['groups'][0]['id'], self.group1.id)
-        self.assertEqual(data['groups'][0]['name'], self.group1.name)
+    def test_readonly_serializer_all_fields_readonly(self, regular_user):
+        """Test that all fields in read-only serializer are read-only."""
+        # GIVEN
+        # Read-only serializer
+        serializer = UserReadOnlySerializer(instance=regular_user)
 
-        # Check permissions are serialized
-        self.assertIn('user_permissions', data)
-        self.assertEqual(len(data['user_permissions']), 1)
-        self.assertEqual(data['user_permissions'][0]['id'], self.permission1.id)
+        # WHEN
+        # Check all fields
 
-    def test_readonly_serializer_all_fields_readonly(self):
-        """Test that all fields in read-only serializer are read-only"""
-        serializer = UserReadOnlySerializer(instance=self.user)
-
+        # THEN
         for field_name, field in serializer.fields.items():
-            self.assertTrue(
-                field.read_only,
-                f"Field '{field_name}' should be read-only"
-            )
+            assert field.read_only, f"Field '{field_name}' should be read-only"
 
     def test_readonly_serializer_cannot_create(self):
-        """Test that read-only serializer cannot create objects"""
+        """Test that read-only serializer cannot create objects."""
+        # GIVEN
+        # Data for creation
         data = {
             'username': 'newuser',
-            'password': 'newpass123'
+            'password': 'NewPass123!'
         }
         serializer = UserReadOnlySerializer(data=data)
 
-        with self.assertRaises(NotImplementedError):
+        # WHEN/THEN
+        # Should raise NotImplementedError when trying to save
+        with pytest.raises(NotImplementedError):
             serializer.save()
 
-    def test_readonly_serializer_with_multiple_groups(self):
-        """Test read-only serializer with multiple groups"""
-        group2 = Group.objects.create(name='Test RO Group 2')
-        self.user.groups.add(group2)
+    def test_readonly_serializer_with_multiple_groups(
+        self, regular_user, test_group, test_group_2
+    ):
+        """Test read-only serializer with multiple groups."""
+        # GIVEN
+        # User with multiple groups
+        regular_user.groups.add(test_group, test_group_2)
+        serializer = UserDetailReadOnlySerializer(instance=regular_user)
 
-        serializer = UserReadOnlySerializer(instance=self.user)
+        # WHEN
         data = serializer.data
 
-        self.assertEqual(len(data['groups']), 2)
+        # THEN
+        assert len(data['groups']) == 2
         group_names = [g['name'] for g in data['groups']]
-        self.assertIn('Test RO Group 1', group_names)
-        self.assertIn('Test RO Group 2', group_names)
+        assert test_group.name in group_names
+        assert test_group_2.name in group_names
 
-    def test_readonly_serializer_with_multiple_permissions(self):
-        """Test read-only serializer with multiple permissions"""
-        permission2 = Permission.objects.create(
-            codename='test_ro_permission2',
-            name='Test RO Permission 2',
-            content_type=self.content_type
-        )
-        self.user.user_permissions.add(permission2)
+    def test_readonly_serializer_with_no_groups_or_permissions(self, regular_user):
+        """Test read-only serializer with user having no groups or permissions."""
+        # GIVEN
+        # User without groups or permissions
+        regular_user.groups.clear()
+        regular_user.user_permissions.clear()
+        serializer = UserDetailReadOnlySerializer(instance=regular_user)
 
-        serializer = UserReadOnlySerializer(instance=self.user)
+        # WHEN
         data = serializer.data
 
-        self.assertEqual(len(data['user_permissions']), 2)
-        permission_codenames = [p['codename'] for p in data['user_permissions']]
-        self.assertIn('test_ro_permission1', permission_codenames)
-        self.assertIn('test_ro_permission2', permission_codenames)
+        # THEN
+        assert len(data['groups']) == 0
+        assert len(data['user_permissions']) == 0
 
-    def test_readonly_serializer_groups_include_permissions(self):
-        """Test that groups in read-only serializer include their permissions"""
-        serializer = UserReadOnlySerializer(instance=self.user)
-        data = serializer.data
-
-        group_data = data['groups'][0]
-        self.assertIn('permissions', group_data)
-        self.assertEqual(len(group_data['permissions']), 1)
-        self.assertEqual(group_data['permissions'][0]['id'], self.permission1.id)
-
-    def test_readonly_serializer_with_no_groups_or_permissions(self):
-        """Test read-only serializer with user having no groups or permissions"""
-        user_no_perms = User.objects.create_user(
-            username='nopermsuser',
-            password='testpass123'
-        )
-
-        serializer = UserReadOnlySerializer(instance=user_no_perms)
-        data = serializer.data
-
-        self.assertEqual(len(data['groups']), 0)
-        self.assertEqual(len(data['user_permissions']), 0)
-
-    def test_readonly_serializer_many(self):
-        """Test read-only serializer with many=True"""
-        user2 = User.objects.create_user(
-            username='user2',
-            password='testpass123'
-        )
-
-        users = User.objects.filter(id__in=[self.user.id, user2.id])
+    def test_readonly_serializer_many(self, regular_user, admin_user):
+        """Test read-only serializer with many=True."""
+        # GIVEN
+        # Multiple users
+        users = User.objects.filter(id__in=[regular_user.id, admin_user.id])
         serializer = UserReadOnlySerializer(users, many=True)
+
+        # WHEN
         data = serializer.data
 
-        self.assertEqual(len(data), 2)
+        # THEN
+        assert len(data) == 2
         usernames = [u['username'] for u in data]
-        self.assertIn('readonly_user', usernames)
-        self.assertIn('user2', usernames)
+        assert regular_user.username in usernames
+        assert admin_user.username in usernames

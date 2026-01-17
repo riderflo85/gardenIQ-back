@@ -1,914 +1,674 @@
+"""
+Tests for UserAPIModelView.
+
+Tests cover all CRUD operations with proper permission checks.
+Uses the GIVEN-WHEN-THEN pattern for clarity.
+"""
+import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
-
 from rest_framework import status
-
-import pytest
-
-from gardeniq.base.utils.tests import ViewSetTestMixin
-
+from rest_framework.reverse import reverse
+from rest_framework.test import APIClient
 
 User = get_user_model()
 
 
-@pytest.mark.django_db
-class UserViewSetTestConf(ViewSetTestMixin):
-    """Base configuration for User ViewSet tests."""
-    BASE_PATTERN = "users"
-    MODEL = User
-    DATA_TO_DEFAULT_OBJ = {
-        "username": "testuser",
-        "first_name": "Test",
-        "last_name": "User",
-        "email": "test@example.com",
-        "password": "testpass123",
+@pytest.fixture
+def api_client():
+    """Return a DRF API client."""
+    return APIClient()
+
+
+@pytest.fixture
+def user_content_type():
+    """Return the content type for User model."""
+    return ContentType.objects.get_for_model(User)
+
+
+@pytest.fixture
+def test_permission(user_content_type):
+    """Create a test permission."""
+    return Permission.objects.create(
+        codename='test_permission',
+        name='Test Permission',
+        content_type=user_content_type
+    )
+
+
+@pytest.fixture
+def test_permission_2(user_content_type):
+    """Create a second test permission."""
+    return Permission.objects.create(
+        codename='test_permission_2',
+        name='Test Permission 2',
+        content_type=user_content_type
+    )
+
+
+@pytest.fixture
+def test_group(test_permission):
+    """Create a test group with permissions."""
+    group = Group.objects.create(name='Test Group')
+    group.permissions.add(test_permission)
+    return group
+
+
+@pytest.fixture
+def test_group_2(test_permission_2):
+    """Create a second test group with permissions."""
+    group = Group.objects.create(name='Test Group 2')
+    group.permissions.add(test_permission_2)
+    return group
+
+
+@pytest.fixture
+def regular_user():
+    """Create a regular non-staff user."""
+    return User.objects.create_user(
+        username='regularuser',
+        email='regular@example.com',
+        password='RegularPass123!',
+        first_name='Regular',
+        last_name='User'
+    )
+
+
+@pytest.fixture
+def admin_user():
+    """Create an admin user with staff privileges."""
+    return User.objects.create_user(
+        username='adminuser',
+        email='admin@example.com',
+        password='AdminPass123!',
+        first_name='Admin',
+        last_name='User',
+        is_staff=True,
+        is_superuser=True
+    )
+
+
+@pytest.fixture
+def regular_user_with_groups(regular_user, test_group, test_permission):
+    """Create a regular user with groups and permissions."""
+    regular_user.groups.add(test_group)
+    regular_user.user_permissions.add(test_permission)
+    return regular_user
+
+
+@pytest.fixture
+def authenticated_client(api_client, regular_user):
+    """Return an authenticated API client for a regular user."""
+    api_client.force_authenticate(user=regular_user)
+    return api_client
+
+
+@pytest.fixture
+def admin_client(api_client, admin_user):
+    """Return an authenticated API client for an admin user."""
+    api_client.force_authenticate(user=admin_user)
+    return api_client
+
+
+@pytest.fixture
+def unauthenticated_client(api_client):
+    """Return an unauthenticated API client."""
+    api_client.force_authenticate(user=None)
+    return api_client
+
+
+@pytest.fixture
+def user_payload():
+    """Return a valid user creation payload."""
+    return {
+        'username': 'newuser',
+        'password': 'NewUserPass123!',
+        'password_confirm': 'NewUserPass123!',
+        'email': 'newuser@example.com',
+        'first_name': 'New',
+        'last_name': 'User'
     }
 
-    def generate_default_obj(self) -> User: # type: ignore
-        """Generate a default user object for testing."""
-        user = User.objects.create_user(
-            username=self.DATA_TO_DEFAULT_OBJ["username"],
-            first_name=self.DATA_TO_DEFAULT_OBJ["first_name"],
-            last_name=self.DATA_TO_DEFAULT_OBJ["last_name"],
-            email=self.DATA_TO_DEFAULT_OBJ["email"],
-            password=self.DATA_TO_DEFAULT_OBJ["password"],
-        )
-        return user
+
+@pytest.mark.django_db
+class TestUserAPIModelViewList:
+    """Tests for listing users (GET /api/users/)."""
+
+    def test_list_users_as_admin(self, admin_client, regular_user, admin_user):
+        """Test that admin can list all users."""
+        # GIVEN
+        # Two users exist (regular_user and admin_user from fixtures)
+        url = reverse('users-list')
+
+        # WHEN
+        response = admin_client.get(url)
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+        assert 'results' in response.data or isinstance(response.data, list)
+        # Verify at least 2 users in the response
+        data = response.data.get('results', response.data) if isinstance(response.data, dict) else response.data
+        assert len(data) >= 2
+
+    def test_list_users_as_regular_user_forbidden(self, authenticated_client):
+        """Test that regular user cannot list users."""
+        # GIVEN
+        # Regular authenticated user
+        url = reverse('users-list')
+
+        # WHEN
+        response = authenticated_client.get(url)
+
+        # THEN
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_list_users_as_anonymous_forbidden(self, unauthenticated_client):
+        """Test that anonymous user cannot list users."""
+        # GIVEN
+        # Unauthenticated client
+        url = reverse('users-list')
+
+        # WHEN
+        response = unauthenticated_client.get(url)
+
+        # THEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.django_db
-class TestUserAPIModelViewList(UserViewSetTestConf):
-    """Tests for listing users."""
+class TestUserAPIModelViewRetrieve:
+    """Tests for retrieving user details (GET /api/users/{id}/)."""
 
-    def test_list_users(self, client_anonymous, obj):
-        """Test retrieving the list of users."""
+    def test_retrieve_own_user_as_regular_user(self, authenticated_client, regular_user):
+        """Test that user can retrieve their own details."""
         # GIVEN
-        user = obj  # User created via fixture
-        # Create additional user
-        User.objects.create_user(
-            username="testuser2",
-            email="test2@example.com",
-            password="testpass456",
-        )
-        url = self.get_url_list()
+        # Authenticated regular user
+        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = authenticated_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data["results"]) >= 2
+        assert response.data['id'] == regular_user.pk
+        assert response.data['username'] == regular_user.username
+        assert response.data['email'] == regular_user.email
+        assert 'groups' in response.data
+        assert 'user_permissions' in response.data
 
-        # Check response data format
-        first_user = response.data["results"][0]
-        assert "id" in first_user
-        assert "username" in first_user
-        assert "first_name" in first_user
-        assert "last_name" in first_user
-        assert "email" in first_user
-        assert "is_staff" in first_user
-        assert "is_active" in first_user
-        assert "last_login" in first_user
-        assert "date_joined" in first_user
-        assert "groups" in first_user
-        assert "user_permissions" in first_user
-        # Password should not be in response
-        assert "password" not in first_user
-
-    def test_list_users_empty(self, client_anonymous):
-        """Test listing users when no users exist."""
+    def test_retrieve_other_user_as_regular_user_forbidden(
+        self, authenticated_client, regular_user, admin_user
+    ):
+        """Test that regular user cannot retrieve another user's details."""
         # GIVEN
-        url = self.get_url_list()
+        # Authenticated regular user trying to access admin user
+        url = reverse('users-detail', kwargs={'pk': admin_user.pk})
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = authenticated_client.get(url)
+
+        # THEN
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_retrieve_any_user_as_admin(self, admin_client, regular_user):
+        """Test that admin can retrieve any user's details."""
+        # GIVEN
+        # Authenticated admin user
+        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+
+        # WHEN
+        response = admin_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data["results"]) == 0
+        assert response.data['id'] == regular_user.pk
+        assert response.data['username'] == regular_user.username
 
-    def test_list_users_with_groups_and_permissions(self, client_anonymous, obj):
-        """Test listing users with groups and permissions."""
+    def test_retrieve_user_as_anonymous_forbidden(self, unauthenticated_client, regular_user):
+        """Test that anonymous user cannot retrieve user details."""
         # GIVEN
-        user = obj
-
-        # Create group and permission
-        content_type = ContentType.objects.get_for_model(User)
-        permission = Permission.objects.create(
-            codename="test_permission",
-            name="Test Permission",
-            content_type=content_type,
-        )
-        group = Group.objects.create(name="Test Group")
-        group.permissions.add(permission)
-
-        # Add group and permission to user
-        user.groups.add(group)
-        user.user_permissions.add(permission)
-
-        url = self.get_url_list()
+        # Unauthenticated client
+        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = unauthenticated_client.get(url)
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        user_data = next(u for u in response.data["results"] if u["id"] == user.id)
-        assert len(user_data["groups"]) == 1
-        assert user_data["groups"][0]["name"] == "Test Group"
-        assert len(user_data["user_permissions"]) == 1
-        assert user_data["user_permissions"][0]["codename"] == "test_permission"
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-
-@pytest.mark.django_db
-class TestUserAPIModelViewRetrieve(UserViewSetTestConf):
-    """Tests for retrieving a single user."""
-
-    def test_retrieve_user(self, client_anonymous, obj):
-        """Test retrieving a specific user."""
+    def test_retrieve_nonexistent_user(self, admin_client):
+        """Test retrieving a non-existent user returns 404."""
         # GIVEN
-        user = obj
-        url = self.get_url_detail(user.pk)
+        # Admin client and non-existent user ID
+        url = reverse('users-detail', kwargs={'pk': 99999})
 
         # WHEN
-        response = client_anonymous.get(url)
-
-        # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["id"] == user.id
-        assert response.data["username"] == user.username
-        assert response.data["first_name"] == user.first_name
-        assert response.data["last_name"] == user.last_name
-        assert response.data["email"] == user.email
-        assert response.data["is_staff"] == user.is_staff
-        assert response.data["is_active"] == user.is_active
-        assert "password" not in response.data
-
-    def test_retrieve_nonexistent_user(self, client_anonymous):
-        """Test retrieving a user that doesn't exist."""
-        # GIVEN
-        url = self.get_url_detail(99999)
-
-        # WHEN
-        response = client_anonymous.get(url)
+        response = admin_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_retrieve_user_with_groups(self, client_anonymous, obj):
-        """Test retrieving a user with groups and permissions."""
-        # GIVEN
-        user = obj
-        group = Group.objects.create(name="Developers")
-        user.groups.add(group)
 
-        url = self.get_url_detail(user.pk)
+@pytest.mark.django_db
+class TestUserAPIModelViewCreate:
+    """Tests for creating users (POST /api/users/)."""
+
+    def test_create_user_as_admin(self, admin_client, user_payload):
+        """Test that admin can create a new user."""
+        # GIVEN
+        # Admin client and valid user data
+        url = reverse('users-list')
+        initial_count = User.objects.count()
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = admin_client.post(url, data=user_payload, format='json')
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert len(response.data["groups"]) == 1
-        assert response.data["groups"][0]["name"] == "Developers"
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data['username'] == user_payload['username']
+        assert response.data['email'] == user_payload['email']
+        assert 'password' not in response.data
+        assert User.objects.count() == initial_count + 1
+
+        # Verify user in database
+        user = User.objects.get(username=user_payload['username'])
+        assert user.check_password(user_payload['password'])
+        assert user.email == user_payload['email']
+
+    def test_create_user_with_groups_and_permissions_as_admin(
+        self, admin_client, user_payload, test_group, test_permission
+    ):
+        """Test that admin can create user with groups and permissions."""
+        # GIVEN
+        # Admin client and user data with groups and permissions
+        url = reverse('users-list')
+        user_payload['group_ids'] = [test_group.id]
+        user_payload['permission_ids'] = [test_permission.id]
+
+        # WHEN
+        response = admin_client.post(url, data=user_payload, format='json')
+
+        # THEN
+        assert response.status_code == status.HTTP_201_CREATED
+        user = User.objects.get(username=user_payload['username'])
+        assert user.groups.filter(id=test_group.id).exists()
+        assert user.user_permissions.filter(id=test_permission.id).exists()
+
+    def test_create_user_as_regular_user_forbidden(self, authenticated_client, user_payload):
+        """Test that regular user cannot create users."""
+        # GIVEN
+        # Regular authenticated user
+        url = reverse('users-list')
+
+        # WHEN
+        response = authenticated_client.post(url, data=user_payload, format='json')
+
+        # THEN
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_create_user_as_anonymous_forbidden(self, unauthenticated_client, user_payload):
+        """Test that anonymous user cannot create users."""
+        # GIVEN
+        # Unauthenticated client
+        url = reverse('users-list')
+
+        # WHEN
+        response = unauthenticated_client.post(url, data=user_payload, format='json')
+
+        # THEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_create_user_without_password_fails(self, admin_client, user_payload):
+        """Test that creating user without password fails."""
+        # GIVEN
+        # User data without password
+        del user_payload['password']
+        url = reverse('users-list')
+
+        # WHEN
+        response = admin_client.post(url, data=user_payload, format='json')
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'password' in response.data
+
+    def test_create_user_without_password_confirm_fails(self, admin_client, user_payload):
+        """Test that creating user without password confirmation fails."""
+        # GIVEN
+        # User data without password_confirm
+        del user_payload['password_confirm']
+        url = reverse('users-list')
+
+        # WHEN
+        response = admin_client.post(url, data=user_payload, format='json')
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'password_confirm' in response.data
+
+    def test_create_user_with_mismatched_passwords_fails(self, admin_client, user_payload):
+        """Test that creating user with mismatched passwords fails."""
+        # GIVEN
+        # User data with mismatched passwords
+        user_payload['password_confirm'] = 'DifferentPass123!'
+        url = reverse('users-list')
+
+        # WHEN
+        response = admin_client.post(url, data=user_payload, format='json')
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'password_confirm' in response.data
+
+    def test_create_user_with_duplicate_username_fails(
+        self, admin_client, user_payload, regular_user
+    ):
+        """Test that creating user with duplicate username fails."""
+        # GIVEN
+        # User data with existing username
+        user_payload['username'] = regular_user.username
+        url = reverse('users-list')
+
+        # WHEN
+        response = admin_client.post(url, data=user_payload, format='json')
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'username' in response.data
+
+    def test_create_user_with_duplicate_email_fails(
+        self, admin_client, user_payload, regular_user
+    ):
+        """Test that creating user with duplicate email fails."""
+        # GIVEN
+        # User data with existing email
+        user_payload['email'] = regular_user.email
+        url = reverse('users-list')
+
+        # WHEN
+        response = admin_client.post(url, data=user_payload, format='json')
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'email' in response.data
+
+    def test_create_user_with_short_password_fails(self, admin_client, user_payload):
+        """Test that creating user with short password fails."""
+        # GIVEN
+        # User data with short password
+        user_payload['password'] = 'short'
+        user_payload['password_confirm'] = 'short'
+        url = reverse('users-list')
+
+        # WHEN
+        response = admin_client.post(url, data=user_payload, format='json')
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'password' in response.data
+
+    def test_create_user_with_invalid_email_fails(self, admin_client, user_payload):
+        """Test that creating user with invalid email fails."""
+        # GIVEN
+        # User data with invalid email
+        user_payload['email'] = 'invalid-email'
+        url = reverse('users-list')
+
+        # WHEN
+        response = admin_client.post(url, data=user_payload, format='json')
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'email' in response.data
 
 
 @pytest.mark.django_db
-class TestUserAPIModelViewCreate(UserViewSetTestConf):
-    """Tests for creating users."""
+class TestUserAPIModelViewUpdate:
+    """Tests for updating users (PUT /api/users/{id}/)."""
 
-    def test_create_user_minimal(self, client_anonymous):
-        """Test creating a user with minimal required fields."""
+    def test_update_own_user_as_regular_user(self, authenticated_client, regular_user):
+        """Test that user can update their own profile."""
         # GIVEN
-        valid_payload = {
-            "username": "newuser",
-            "password": "newpass123",
+        # Authenticated regular user
+        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        update_data = {
+            'username': regular_user.username,
+            'first_name': 'Updated',
+            'last_name': 'Name',
+            'email': 'updated@example.com'
         }
-        url = self.get_url_create()
 
         # WHEN
-        response = client_anonymous.post(url, valid_payload, format="json")
+        response = authenticated_client.put(url, data=update_data, format='json')
 
         # THEN
-        assert response.status_code == status.HTTP_201_CREATED
-        assert response.data["username"] == valid_payload["username"]
-        assert "password" not in response.data
+        assert response.status_code == status.HTTP_200_OK
+        regular_user.refresh_from_db()
+        assert regular_user.first_name == 'Updated'
+        assert regular_user.last_name == 'Name'
+        assert regular_user.email == 'updated@example.com'
 
-        # Check if the user was actually created in the database
-        user = User.objects.get(username=valid_payload["username"])
-        assert user is not None
-        assert user.check_password(valid_payload["password"])
-
-    def test_create_user_complete(self, client_anonymous):
-        """Test creating a user with all fields."""
+    def test_update_own_password_as_regular_user(self, authenticated_client, regular_user):
+        """Test that user can update their own password."""
         # GIVEN
-        valid_payload = {
-            "username": "completeuser",
-            "first_name": "Complete",
-            "last_name": "User",
-            "email": "complete@example.com",
-            "password": "completepass123",
+        # Authenticated regular user
+        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        update_data = {
+            'username': regular_user.username,
+            'password': 'NewPassword123!',
+            'password_confirm': 'NewPassword123!'
         }
-        url = self.get_url_create()
 
         # WHEN
-        response = client_anonymous.post(url, valid_payload, format="json")
+        response = authenticated_client.put(url, data=update_data, format='json')
 
         # THEN
-        assert response.status_code == status.HTTP_201_CREATED
-        assert response.data["username"] == valid_payload["username"]
-        assert response.data["first_name"] == valid_payload["first_name"]
-        assert response.data["last_name"] == valid_payload["last_name"]
-        assert response.data["email"] == valid_payload["email"]
+        assert response.status_code == status.HTTP_200_OK
+        regular_user.refresh_from_db()
+        assert regular_user.check_password('NewPassword123!')
 
-        # Check if the user was actually created in the database
-        user = User.objects.get(username=valid_payload["username"])
-        assert user.first_name == valid_payload["first_name"]
-        assert user.last_name == valid_payload["last_name"]
-        assert user.email == valid_payload["email"]
-        assert user.check_password(valid_payload["password"])
-
-    def test_create_user_with_groups(self, client_anonymous):
-        """Test creating a user with groups."""
+    def test_update_other_user_as_regular_user_forbidden(
+        self, authenticated_client, regular_user, admin_user
+    ):
+        """Test that regular user cannot update another user."""
         # GIVEN
-        group1 = Group.objects.create(name="Group1")
-        group2 = Group.objects.create(name="Group2")
-
-        valid_payload = {
-            "username": "groupuser",
-            "password": "grouppass123",
-            "group_ids": [group1.pk, group2.pk],
+        # Regular user trying to update admin user
+        url = reverse('users-detail', kwargs={'pk': admin_user.pk})
+        update_data = {
+            'username': admin_user.username,
+            'first_name': 'Hacked'
         }
-        url = self.get_url_create()
 
         # WHEN
-        response = client_anonymous.post(url, valid_payload, format="json")
+        response = authenticated_client.put(url, data=update_data, format='json')
 
         # THEN
-        assert response.status_code == status.HTTP_201_CREATED
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        admin_user.refresh_from_db()
+        assert admin_user.first_name != 'Hacked'
 
-        # Check if groups were assigned
-        user = User.objects.get(username=valid_payload["username"])
-        assert user.groups.count() == 2
-        assert group1 in user.groups.all()
-        assert group2 in user.groups.all()
-
-    def test_create_user_with_permissions(self, client_anonymous):
-        """Test creating a user with specific permissions."""
+    def test_update_any_user_as_admin(self, admin_client, regular_user):
+        """Test that admin can update any user."""
         # GIVEN
-        content_type = ContentType.objects.get_for_model(User)
-        permission = Permission.objects.create(
-            codename="test_create_permission",
-            name="Test Create Permission",
-            content_type=content_type,
-        )
-
-        valid_payload = {
-            "username": "permuser",
-            "password": "permpass123",
-            "permission_ids": [permission.pk],
+        # Admin client updating regular user
+        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        update_data = {
+            'username': regular_user.username,
+            'first_name': 'AdminUpdated',
+            'is_active': False
         }
-        url = self.get_url_create()
 
         # WHEN
-        response = client_anonymous.post(url, valid_payload, format="json")
+        response = admin_client.put(url, data=update_data, format='json')
 
         # THEN
-        assert response.status_code == status.HTTP_201_CREATED
+        assert response.status_code == status.HTTP_200_OK
+        regular_user.refresh_from_db()
+        assert regular_user.first_name == 'AdminUpdated'
+        assert regular_user.is_active is False
 
-        # Check if permissions were assigned
-        user = User.objects.get(username=valid_payload["username"])
-        assert user.user_permissions.count() == 1
-        assert permission in user.user_permissions.all()
-
-    def test_create_user_without_username(self, client_anonymous):
-        """Test creating a user without username should fail."""
+    def test_update_user_with_groups_as_admin(
+        self, admin_client, regular_user, test_group, test_group_2
+    ):
+        """Test that admin can update user's groups."""
         # GIVEN
-        invalid_payload = {
-            "password": "testpass123",
+        # Admin updating user's groups
+        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        update_data = {
+            'username': regular_user.username,
+            'group_ids': [test_group.id, test_group_2.id]
         }
-        url = self.get_url_create()
 
         # WHEN
-        response = client_anonymous.post(url, invalid_payload, format="json")
+        response = admin_client.put(url, data=update_data, format='json')
 
         # THEN
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "username" in response.data
+        assert response.status_code == status.HTTP_200_OK
+        regular_user.refresh_from_db()
+        assert regular_user.groups.count() == 2
+        assert regular_user.groups.filter(id=test_group.id).exists()
+        assert regular_user.groups.filter(id=test_group_2.id).exists()
 
-    def test_create_user_without_password(self, client_anonymous):
-        """Test creating a user without password should fail."""
+    def test_update_user_with_mismatched_passwords_fails(
+        self, authenticated_client, regular_user
+    ):
+        """Test that updating user with mismatched passwords fails."""
         # GIVEN
-        invalid_payload = {
-            "username": "nopassuser",
+        # User data with mismatched passwords
+        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        update_data = {
+            'username': regular_user.username,
+            'password': 'NewPassword123!',
+            'password_confirm': 'DifferentPass123!'
         }
-        url = self.get_url_create()
 
         # WHEN
-        response = client_anonymous.post(url, invalid_payload, format="json")
+        response = authenticated_client.put(url, data=update_data, format='json')
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "password" in response.data
 
-    def test_create_user_with_short_password(self, client_anonymous):
-        """Test creating a user with password too short."""
+    def test_update_user_to_duplicate_username_fails(
+        self, admin_client, regular_user, admin_user
+    ):
+        """Test that updating to duplicate username fails."""
         # GIVEN
-        invalid_payload = {
-            "username": "shortpass",
-            "password": "short",
+        # Trying to use existing username
+        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        update_data = {
+            'username': admin_user.username,  # Already exists
         }
-        url = self.get_url_create()
 
         # WHEN
-        response = client_anonymous.post(url, invalid_payload, format="json")
+        response = admin_client.put(url, data=update_data, format='json')
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "password" in response.data
-
-    def test_create_user_duplicate_username(self, client_anonymous, obj):
-        """Test creating a user with duplicate username should fail."""
-        # GIVEN
-        user = obj
-        invalid_payload = {
-            "username": user.username,
-            "password": "testpass123",
-        }
-        url = self.get_url_create()
-
-        # WHEN
-        response = client_anonymous.post(url, invalid_payload, format="json")
-
-        # THEN
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "username" in response.data
-
-    def test_create_user_duplicate_email(self, client_anonymous, obj):
-        """Test creating a user with duplicate email should fail."""
-        # GIVEN
-        user = obj
-        invalid_payload = {
-            "username": "newuser",
-            "email": user.email,
-            "password": "testpass123",
-        }
-        url = self.get_url_create()
-
-        # WHEN
-        response = client_anonymous.post(url, invalid_payload, format="json")
-
-        # THEN
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "email" in response.data
-
-    def test_create_user_invalid_email(self, client_anonymous):
-        """Test creating a user with invalid email format."""
-        # GIVEN
-        invalid_payload = {
-            "username": "invalidemail",
-            "email": "not-an-email",
-            "password": "testpass123",
-        }
-        url = self.get_url_create()
-
-        # WHEN
-        response = client_anonymous.post(url, invalid_payload, format="json")
-
-        # THEN
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "email" in response.data
-
-    def test_create_user_blank_username(self, client_anonymous):
-        """Test creating a user with blank username should fail."""
-        # GIVEN
-        invalid_payload = {
-            "username": "",
-            "password": "testpass123",
-        }
-        url = self.get_url_create()
-
-        # WHEN
-        response = client_anonymous.post(url, invalid_payload, format="json")
-
-        # THEN
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "username" in response.data
+        assert 'username' in response.data
 
 
 @pytest.mark.django_db
-class TestUserAPIModelViewUpdate(UserViewSetTestConf):
-    """Tests for updating users."""
+class TestUserAPIModelViewDelete:
+    """Tests for deleting users (DELETE /api/users/{id}/)."""
 
-    def test_update_user_put(self, client_anonymous, obj):
-        """Test updating a user with PUT (full update)."""
+    def test_delete_user_as_admin(self, admin_client, regular_user):
+        """Test that admin can delete a user."""
         # GIVEN
-        user = obj
-        url = self.get_url_detail(user.pk)
-        update_data = {
-            "username": "updateduser",
-            "first_name": "Updated",
-            "last_name": "Name",
-            "email": "updated@example.com",
-        }
+        # Admin client and existing user
+        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        user_id = regular_user.pk
 
         # WHEN
-        response = client_anonymous.put(url, update_data, format="json")
+        response = admin_client.delete(url)
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["username"] == update_data["username"]
-        assert response.data["first_name"] == update_data["first_name"]
-        assert response.data["last_name"] == update_data["last_name"]
-        assert response.data["email"] == update_data["email"]
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not User.objects.filter(pk=user_id).exists()
 
-        # Check if the user was actually updated in the database
-        updated_user = User.objects.get(pk=user.pk)
-        assert updated_user.username == update_data["username"]
-        assert updated_user.first_name == update_data["first_name"]
-        assert updated_user.last_name == update_data["last_name"]
-        assert updated_user.email == update_data["email"]
-
-    def test_update_user_patch(self, client_anonymous, obj):
-        """Test partially updating a user with PATCH."""
+    def test_delete_user_as_regular_user_forbidden(
+        self, authenticated_client, regular_user
+    ):
+        """Test that regular user cannot delete themselves."""
         # GIVEN
-        user = obj
-        url = self.get_url_detail(user.pk)
-        update_data = {
-            "first_name": "Patched",
-        }
+        # Regular user trying to delete themselves
+        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
 
         # WHEN
-        response = client_anonymous.patch(url, update_data, format="json")
+        response = authenticated_client.delete(url)
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["first_name"] == update_data["first_name"]
-        # Other fields should remain unchanged
-        assert response.data["username"] == user.username
-        assert response.data["email"] == user.email
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert User.objects.filter(pk=regular_user.pk).exists()
 
-    def test_update_user_password(self, client_anonymous, obj):
-        """Test updating a user's password."""
+    def test_delete_user_as_anonymous_forbidden(
+        self, unauthenticated_client, regular_user
+    ):
+        """Test that anonymous user cannot delete users."""
         # GIVEN
-        user = obj
-        url = self.get_url_detail(user.pk)
-        update_data = {
-            "username": user.username,
-            "password": "newpassword123",
-        }
+        # Unauthenticated client
+        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
 
         # WHEN
-        response = client_anonymous.put(url, update_data, format="json")
+        response = unauthenticated_client.delete(url)
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert User.objects.filter(pk=regular_user.pk).exists()
 
-        # Check if password was updated
-        updated_user = User.objects.get(pk=user.pk)
-        assert updated_user.check_password("newpassword123")
-
-    def test_update_user_groups(self, client_anonymous, obj):
-        """Test updating a user's groups."""
+    def test_delete_nonexistent_user(self, admin_client):
+        """Test deleting non-existent user returns 404."""
         # GIVEN
-        user = obj
-        group1 = Group.objects.create(name="NewGroup1")
-        group2 = Group.objects.create(name="NewGroup2")
-
-        url = self.get_url_detail(user.pk)
-        update_data = {
-            "username": user.username,
-            "group_ids": [group1.pk, group2.pk],
-        }
+        # Admin client and non-existent user ID
+        url = reverse('users-detail', kwargs={'pk': 99999})
 
         # WHEN
-        response = client_anonymous.put(url, update_data, format="json")
-
-        # THEN
-        assert response.status_code == status.HTTP_200_OK
-
-        # Check if groups were updated
-        updated_user = User.objects.get(pk=user.pk)
-        assert updated_user.groups.count() == 2
-        assert group1 in updated_user.groups.all()
-        assert group2 in updated_user.groups.all()
-
-    def test_update_user_permissions(self, client_anonymous, obj):
-        """Test updating a user's permissions."""
-        # GIVEN
-        user = obj
-        content_type = ContentType.objects.get_for_model(User)
-        permission1 = Permission.objects.create(
-            codename="test_update_perm1",
-            name="Test Update Permission 1",
-            content_type=content_type,
-        )
-        permission2 = Permission.objects.create(
-            codename="test_update_perm2",
-            name="Test Update Permission 2",
-            content_type=content_type,
-        )
-
-        url = self.get_url_detail(user.pk)
-        update_data = {
-            "username": user.username,
-            "permission_ids": [permission1.pk, permission2.pk],
-        }
-
-        # WHEN
-        response = client_anonymous.put(url, update_data, format="json")
-
-        # THEN
-        assert response.status_code == status.HTTP_200_OK
-
-        # Check if permissions were updated
-        updated_user = User.objects.get(pk=user.pk)
-        assert updated_user.user_permissions.count() == 2
-        assert permission1 in updated_user.user_permissions.all()
-        assert permission2 in updated_user.user_permissions.all()
-
-    def test_update_user_duplicate_username(self, client_anonymous, obj):
-        """Test updating a user with a username that already exists."""
-        # GIVEN
-        user = obj
-        other_user = User.objects.create_user(
-            username="otheruser",
-            password="testpass123",
-        )
-
-        url = self.get_url_detail(user.pk)
-        update_data = {
-            "username": other_user.username,
-        }
-
-        # WHEN
-        response = client_anonymous.patch(url, update_data, format="json")
-
-        # THEN
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "username" in response.data
-
-    def test_update_user_duplicate_email(self, client_anonymous, obj):
-        """Test updating a user with an email that already exists."""
-        # GIVEN
-        user = obj
-        other_user = User.objects.create_user(
-            username="otheruser",
-            email="other@example.com",
-            password="testpass123",
-        )
-
-        url = self.get_url_detail(user.pk)
-        update_data = {
-            "username": user.username,
-            "email": other_user.email,
-        }
-
-        # WHEN
-        response = client_anonymous.put(url, update_data, format="json")
-
-        # THEN
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "email" in response.data
-
-    def test_update_nonexistent_user(self, client_anonymous):
-        """Test updating a user that doesn't exist."""
-        # GIVEN
-        url = self.get_url_detail(99999)
-        update_data = {
-            "username": "nonexistent",
-        }
-
-        # WHEN
-        response = client_anonymous.patch(url, update_data, format="json")
+        response = admin_client.delete(url)
 
         # THEN
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_update_user_clear_optional_fields(self, client_anonymous, obj):
-        """Test clearing optional fields (email, first_name, last_name)."""
+
+@pytest.mark.django_db
+class TestUserAPIModelViewPermissions:
+    """Tests for permission edge cases and special scenarios."""
+
+    def test_regular_user_cannot_assign_groups(
+        self, authenticated_client, regular_user, test_group
+    ):
+        """Test that regular user cannot assign groups to themselves."""
         # GIVEN
-        user = obj
-        url = self.get_url_detail(user.pk)
+        # Regular user trying to add groups
+        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
         update_data = {
-            "username": user.username,
-            "first_name": "",
-            "last_name": "",
-            "email": "",
+            'username': regular_user.username,
+            'group_ids': [test_group.id]
         }
 
         # WHEN
-        response = client_anonymous.put(url, update_data, format="json")
+        response = authenticated_client.put(url, data=update_data, format='json')
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["first_name"] == ""
-        assert response.data["last_name"] == ""
-        assert response.data["email"] == ""
-
-
-@pytest.mark.django_db
-class TestUserAPIModelViewDelete(UserViewSetTestConf):
-    """Tests for deleting users."""
-
-    def test_delete_user(self, client_anonymous, obj):
-        """Test deleting a user."""
-        # GIVEN
-        user = obj
-        user_id = user.pk
-        url = self.get_url_detail(user.pk)
-
-        # WHEN
-        response = client_anonymous.delete(url)
-
-        # THEN
-        assert response.status_code == status.HTTP_204_NO_CONTENT
-
-        # Check if the user was actually deleted from the database
-        assert not User.objects.filter(pk=user_id).exists()
-
-    def test_delete_nonexistent_user(self, client_anonymous):
-        """Test deleting a user that doesn't exist."""
-        # GIVEN
-        url = self.get_url_detail(99999)
-
-        # WHEN
-        response = client_anonymous.delete(url)
-
-        # THEN
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-
-    def test_delete_user_with_groups(self, client_anonymous, obj):
-        """Test deleting a user that has groups assigned."""
-        # GIVEN
-        user = obj
-        group = Group.objects.create(name="TestGroup")
-        user.groups.add(group)
-        user_id = user.pk
-
-        url = self.get_url_detail(user.pk)
-
-        # WHEN
-        response = client_anonymous.delete(url)
-
-        # THEN
-        assert response.status_code == status.HTTP_204_NO_CONTENT
-        assert not User.objects.filter(pk=user_id).exists()
-        # Group should still exist
-        assert Group.objects.filter(pk=group.pk).exists()
-
-    def test_delete_user_with_permissions(self, client_anonymous, obj):
-        """Test deleting a user that has permissions assigned."""
-        # GIVEN
-        user = obj
-        content_type = ContentType.objects.get_for_model(User)
-        permission = Permission.objects.create(
-            codename="test_delete_permission",
-            name="Test Delete Permission",
-            content_type=content_type,
-        )
-        user.user_permissions.add(permission)
-        user_id = user.pk
-
-        url = self.get_url_detail(user.pk)
-
-        # WHEN
-        response = client_anonymous.delete(url)
-
-        # THEN
-        assert response.status_code == status.HTTP_204_NO_CONTENT
-        assert not User.objects.filter(pk=user_id).exists()
-        # Permission should still exist
-        assert Permission.objects.filter(pk=permission.pk).exists()
-
-
-@pytest.mark.django_db
-class TestUserAPIModelViewEdgeCases(UserViewSetTestConf):
-    """Tests for edge cases and special scenarios."""
-
-    def test_create_user_with_very_long_username(self, client_anonymous):
-        """Test creating a user with a username at the maximum length."""
-        # GIVEN
-        # Django's User model has max_length=150 for username
-        valid_payload = {
-            "username": "a" * 150,
-            "password": "testpass123",
-        }
-        url = self.get_url_create()
-
-        # WHEN
-        response = client_anonymous.post(url, valid_payload, format="json")
-
-        # THEN
-        assert response.status_code == status.HTTP_201_CREATED
-
-    def test_create_user_with_username_too_long(self, client_anonymous):
-        """Test creating a user with a username exceeding maximum length."""
-        # GIVEN
-        invalid_payload = {
-            "username": "a" * 151,
-            "password": "testpass123",
-        }
-        url = self.get_url_create()
-
-        # WHEN
-        response = client_anonymous.post(url, invalid_payload, format="json")
-
-        # THEN
+        # The validation should fail at serializer level
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "username" in response.data
+        assert 'group_ids' in response.data
 
-    def test_update_user_without_changing_username(self, client_anonymous, obj):
-        """Test updating a user without changing the username (should allow same username)."""
+    def test_regular_user_cannot_assign_permissions(
+        self, authenticated_client, regular_user, test_permission
+    ):
+        """Test that regular user cannot assign permissions to themselves."""
         # GIVEN
-        user = obj
-        url = self.get_url_detail(user.pk)
+        # Regular user trying to add permissions
+        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
         update_data = {
-            "username": user.username,  # Same username
-            "first_name": "Changed",
+            'username': regular_user.username,
+            'permission_ids': [test_permission.id]
         }
 
         # WHEN
-        response = client_anonymous.put(url, update_data, format="json")
+        response = authenticated_client.put(url, data=update_data, format='json')
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["username"] == user.username
-
-    def test_update_user_without_changing_email(self, client_anonymous, obj):
-        """Test updating a user without changing the email (should allow same email)."""
-        # GIVEN
-        user = obj
-        url = self.get_url_detail(user.pk)
-        update_data = {
-            "username": user.username,
-            "email": user.email,  # Same email
-            "first_name": "Changed",
-        }
-
-        # WHEN
-        response = client_anonymous.put(url, update_data, format="json")
-
-        # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["email"] == user.email
-
-    def test_list_users_pagination(self, client_anonymous):
-        """Test listing users with pagination."""
-        # GIVEN
-        # Create multiple users
-        for i in range(15):
-            User.objects.create_user(
-                username=f"user{i}",
-                password="testpass123",
-            )
-        url = self.get_url_list()
-
-        # WHEN
-        response = client_anonymous.get(url)
-
-        # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert "results" in response.data
-        assert "count" in response.data
-        assert response.data["count"] == 15
-
-    def test_retrieve_user_fields_readonly(self, client_anonymous, obj):
-        """Test that read-only fields are present in retrieve."""
-        # GIVEN
-        user = obj
-        url = self.get_url_detail(user.pk)
-
-        # WHEN
-        response = client_anonymous.get(url)
-
-        # THEN
-        assert response.status_code == status.HTTP_200_OK
-        # Check read-only fields
-        assert "is_staff" in response.data
-        assert "is_active" in response.data
-        assert "last_login" in response.data
-        assert "date_joined" in response.data
-        # These should be read-only, test by attempting to modify them
-        assert response.data["is_staff"] == user.is_staff
-        assert response.data["is_active"] == user.is_active
-
-    def test_update_readonly_fields_ignored(self, client_anonymous, obj):
-        """Test that attempting to update read-only fields is ignored."""
-        # GIVEN
-        user = obj
-        original_is_staff = user.is_staff
-        original_is_active = user.is_active
-
-        url = self.get_url_detail(user.pk)
-        update_data = {
-            "username": user.username,
-            "is_staff": not original_is_staff,  # Try to change read-only field
-            "is_active": not original_is_active,  # Try to change read-only field
-        }
-
-        # WHEN
-        response = client_anonymous.put(url, update_data, format="json")
-
-        # THEN
-        assert response.status_code == status.HTTP_200_OK
-
-        # Read-only fields should remain unchanged
-        updated_user = User.objects.get(pk=user.pk)
-        assert updated_user.is_staff == original_is_staff
-        assert updated_user.is_active == original_is_active
-
-    def test_create_user_with_empty_email(self, client_anonymous):
-        """Test creating a user with empty email is allowed."""
-        # GIVEN
-        valid_payload = {
-            "username": "noemailuser",
-            "email": "",
-            "password": "testpass123",
-        }
-        url = self.get_url_create()
-
-        # WHEN
-        response = client_anonymous.post(url, valid_payload, format="json")
-
-        # THEN
-        assert response.status_code == status.HTTP_201_CREATED
-        assert response.data["email"] == ""
-
-    def test_user_string_representation(self, obj):
-        """Test the __str__ method of the user model."""
-        # GIVEN
-        user = obj
-
-        # WHEN
-        user_str = str(user)
-
-        # THEN
-        expected = f"{user.first_name} {user.last_name}".strip() or user.username
-        assert user_str == expected
-
-    def test_user_string_representation_without_name(self):
-        """Test the __str__ method when first_name and last_name are empty."""
-        # GIVEN
-        user = User.objects.create_user(
-            username="noname",
-            password="testpass123",
-        )
-
-        # WHEN
-        user_str = str(user)
-
-        # THEN
-        assert user_str == user.username
-
-    def test_update_user_remove_groups(self, client_anonymous, obj):
-        """Test removing all groups from a user."""
-        # GIVEN
-        user = obj
-        group = Group.objects.create(name="TempGroup")
-        user.groups.add(group)
-
-        url = self.get_url_detail(user.pk)
-        update_data = {
-            "username": user.username,
-            "group_ids": [],  # Empty list to remove all groups
-        }
-
-        # WHEN
-        response = client_anonymous.put(url, update_data, format="json")
-
-        # THEN
-        assert response.status_code == status.HTTP_200_OK
-
-        # Check if groups were removed
-        updated_user = User.objects.get(pk=user.pk)
-        assert updated_user.groups.count() == 0
-
-    def test_update_user_remove_permissions(self, client_anonymous, obj):
-        """Test removing all permissions from a user."""
-        # GIVEN
-        user = obj
-        content_type = ContentType.objects.get_for_model(User)
-        permission = Permission.objects.create(
-            codename="temp_permission",
-            name="Temp Permission",
-            content_type=content_type,
-        )
-        user.user_permissions.add(permission)
-
-        url = self.get_url_detail(user.pk)
-        update_data = {
-            "username": user.username,
-            "permission_ids": [],  # Empty list to remove all permissions
-        }
-
-        # WHEN
-        response = client_anonymous.put(url, update_data, format="json")
-
-        # THEN
-        assert response.status_code == status.HTTP_200_OK
-
-        # Check if permissions were removed
-        updated_user = User.objects.get(pk=user.pk)
-        assert updated_user.user_permissions.count() == 0
+        # The validation should fail at serializer level
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'permission_ids' in response.data

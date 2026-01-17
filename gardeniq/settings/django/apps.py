@@ -11,6 +11,7 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
+    "knox",
     "django_filters",
     "corsheaders",
     "drf_spectacular",

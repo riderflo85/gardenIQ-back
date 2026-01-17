@@ -13,6 +13,7 @@ django-extensions = "*"
 pyserial = "*"
 requests = "*"
 tzdata = "*"
+django-rest-knox = "*"
 
 [dev-packages]
 pytest = "*"

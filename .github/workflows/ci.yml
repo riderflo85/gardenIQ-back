@@ -33,20 +33,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements_dev.txt
 
-      # 4. Check imports with isort (mode check only)
+      # 4. Check code formatting with black
+      - name: Run black check
+        run: black --check .
+
+      # 5. Check imports with isort (mode check only)
       - name: Run isort check
         run: isort --check-only --diff .
 
-      # 5. Check code style with flake8
+      # 6. Check code style with flake8
       - name: Run flake8
         run: flake8 .
 
-      # 6. Run tests with coverage
+      # 7. Run tests with coverage
       - name: Run tests with pytest and coverage
         run: |
           pytest --cov=. --cov-report=html --cov-report=term-missing
 
-      # 7. Save coverage report like artefact
+      # 8. Save coverage report like artefact
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:

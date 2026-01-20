@@ -7,7 +7,7 @@ repos:
         language: system
         types: [python]
         require_serial: true
-        args: [--force-exclude, gardeniq]
+        args: [gardeniq, --force-exclude, ^.*/migrations/.*$]
 
       - id: check-json
         name: Check Json

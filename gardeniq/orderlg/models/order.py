@@ -42,6 +42,10 @@ class Order(
         help_text="All the arguments necessary for the command to work.",
     )
 
+    class Meta:
+        verbose_name = "order"
+        verbose_name_plural = "orders"
+
     def __str__(self) -> str:
         return f"Order `{self.name}` {self.if_enabled()}"
 

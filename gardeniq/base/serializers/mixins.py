@@ -32,8 +32,7 @@ class AutocompleteSlugMixinSerializer(serializers.Serializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         assert hasattr(self.Meta, "prepopulated_slug_with"), (
-            "Error missing `prepopulated_slug_with` attribut to `Meta` class for %s"
-            % self.__class__.__name__
+            "Error missing `prepopulated_slug_with` attribut to `Meta` class for %s" % self.__class__.__name__
         )
 
     def validate(self, data):

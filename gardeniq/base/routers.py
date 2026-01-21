@@ -12,6 +12,7 @@ class ToggleObjectRouter(DefaultRouter):
 
     These routes are intended for toggling the enabled/disabled state of an object via custom viewset actions.
     """
+
     routes = [
         Route(
             url=r"^{prefix}/{lookup}/enable{trailing_slash}$",

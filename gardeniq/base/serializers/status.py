@@ -8,7 +8,7 @@ from gardeniq.base.serializers import NameMixinSerializer
 from gardeniq.base.serializers import OptionalDescriptionMixinSerializer
 from gardeniq.base.serializers import ReadOnlySerializer
 
-color_regex = re.compile(r'^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$')
+color_regex = re.compile(r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$")
 
 
 class StatusSerializer(
@@ -17,7 +17,12 @@ class StatusSerializer(
     OptionalDescriptionMixinSerializer,
 ):
     tag = serializers.SlugField()
-    color = serializers.RegexField(color_regex, max_length=7, min_length=3, default=Status.DEFAULT_COLOR,)
+    color = serializers.RegexField(
+        color_regex,
+        max_length=7,
+        min_length=3,
+        default=Status.DEFAULT_COLOR,
+    )
 
     class Meta:
         model = Status
@@ -37,4 +42,5 @@ class StatusReadOnlySerializer(ReadOnlySerializer, StatusSerializer):
     This serializer is intended for use cases where Status data should be exposed
     in a read-only format, preventing any modifications through the API.
     """
+
     pass

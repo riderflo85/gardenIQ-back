@@ -26,32 +26,25 @@ class BaseSeeder:
     ) -> None:
         """Check if class attributs is set by children."""
         assert hasattr(self, "model"), (
-            "Error missing `model` attribut to `BaseSeeder` class for %s"
-            % self.__class__.__name__
+            "Error missing `model` attribut to `BaseSeeder` class for %s" % self.__class__.__name__
         )
         assert issubclass(self.model, Model), (
-            "Error `model` attribut must be a subclass of `Model` for %s"
-            % self.__class__.__name__
+            "Error `model` attribut must be a subclass of `Model` for %s" % self.__class__.__name__
         )
         assert hasattr(self, "serializer"), (
-            "Error missing `serializer` attribut to `BaseSeeder` class for %s"
-            % self.__class__.__name__
+            "Error missing `serializer` attribut to `BaseSeeder` class for %s" % self.__class__.__name__
         )
         assert issubclass(self.serializer, Serializer), (
-            "Error `serializer` attribut must be a subclass of `Serializer` for %s"
-            % self.__class__.__name__
+            "Error `serializer` attribut must be a subclass of `Serializer` for %s" % self.__class__.__name__
         )
         assert hasattr(self, "filename"), (
-            "Error missing `filename` attribut to `BaseSeeder` class for %s"
-            % self.__class__.__name__
+            "Error missing `filename` attribut to `BaseSeeder` class for %s" % self.__class__.__name__
         )
         assert hasattr(self, "root_dir_source"), (
-            "Error missing `root_dir_source` attribut to `BaseSeeder` class for %s"
-            % self.__class__.__name__
+            "Error missing `root_dir_source` attribut to `BaseSeeder` class for %s" % self.__class__.__name__
         )
         assert hasattr(self, "search_field_name"), (
-            "Error missing `search_field_name` attribut to `BaseSeeder` class for %s"
-            % self.__class__.__name__
+            "Error missing `search_field_name` attribut to `BaseSeeder` class for %s" % self.__class__.__name__
         )
 
         self.success_logger = success_logger

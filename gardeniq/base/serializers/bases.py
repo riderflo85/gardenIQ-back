@@ -14,8 +14,7 @@ class BaseSerializer(PKMixinSerializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         assert hasattr(self.Meta, "model"), (
-            "Error missing `model` attribut to `Meta` class for %s"
-            % self.__class__.__name__
+            "Error missing `model` attribut to `Meta` class for %s" % self.__class__.__name__
         )
 
     def create(self, validated_data: Dict):
@@ -44,14 +43,10 @@ class ReadOnlySerializer(serializers.Serializer):
         """
         Raises NotImplementedError because this read-only serializer does not create objects.
         """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} is read-only and cannot create objects."
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} is read-only and cannot create objects.")
 
     def update(self, instance, validated_data):
         """
         Raises NotImplementedError because this read-only serializer does not update objects.
         """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} is read-only and cannot update objects."
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} is read-only and cannot update objects.")

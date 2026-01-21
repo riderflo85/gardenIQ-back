@@ -3,6 +3,7 @@ import pytest
 from gardeniq.orderlg.models import Argument
 from gardeniq.orderlg.models import Order
 from gardeniq.orderlg.serializers import OrderDetailReadOnlySerializer
+from gardeniq.orderlg.serializers import OrderListReadOnlySerializer
 from gardeniq.orderlg.serializers import OrderSerializer
 
 
@@ -139,6 +140,105 @@ class TestOrderSerializer:
         assert order.description == updated_data["description"]
         assert order.action_type == updated_data["action_type"]
         assert order.arguments.count() == 2
+
+
+@pytest.mark.django_db
+class TestOrderListReadOnlySerializer:
+    def test_cannot_create_order_serializer(self):
+        # GIVEN
+        order_count_before = Order.objects.count()
+        data = {
+            "name": "Test Order",
+            "action_type": "get",
+        }
+
+        # WHEN
+        serializer = OrderListReadOnlySerializer(data=data)
+        assert serializer.is_valid()
+        with pytest.raises(NotImplementedError):
+            serializer.save()
+
+        order_count_after = Order.objects.count()
+
+        # THEN
+        assert order_count_before == order_count_after
+
+    def test_cannot_update_order_serializer(self, create_order):
+        # GIVEN
+        order = create_order
+        data = {
+            "name": "Test Update Order",
+            "action_type": "set",
+        }
+
+        # WHEN
+        serializer = OrderListReadOnlySerializer(instance=order, data=data)
+        assert serializer.is_valid()
+        with pytest.raises(NotImplementedError):
+            serializer.save()
+
+        order_after_trying_update = Order.objects.get(pk=order.pk)
+
+        # THEN
+        assert order_after_trying_update.name != data["name"]
+        assert order_after_trying_update.name == order.name
+
+    def test_list_serializer(self, create_order):
+        # GIVEN
+        order = create_order
+        expected = {
+            "id": order.pk,
+            "name": order.name,
+            "slug": order.slug,
+            "action_type": order.action_type,
+            "is_enabled": order.is_enabled,
+        }
+
+        # WHEN
+        serializer = OrderListReadOnlySerializer(instance=order)
+
+        # THEN
+        assert serializer.data == expected
+
+    def test_list_serializer_multiple_orders(self, create_arguments):
+        # GIVEN
+        arg1, arg2 = create_arguments
+        order1 = Order.objects.create(
+            name="First Order",
+            description="First Description",
+            action_type="get",
+        )
+        order1.arguments.set([arg1])
+
+        order2 = Order.objects.create(
+            name="Second Order",
+            description="Second Description",
+            action_type="set",
+        )
+        order2.arguments.set([arg2])
+
+        expected = [
+            {
+                "id": order1.pk,
+                "name": order1.name,
+                "slug": order1.slug,
+                "action_type": order1.action_type,
+                "is_enabled": order1.is_enabled,
+            },
+            {
+                "id": order2.pk,
+                "name": order2.name,
+                "slug": order2.slug,
+                "action_type": order2.action_type,
+                "is_enabled": order2.is_enabled,
+            },
+        ]
+
+        # WHEN
+        serializer = OrderListReadOnlySerializer(instance=[order1, order2], many=True)
+
+        # THEN
+        assert serializer.data == expected
 
 
 @pytest.mark.django_db

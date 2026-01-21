@@ -23,6 +23,7 @@ class ViewSetTestMixin:
         obj() -> type[Model]:
             Returns a default model instance for use in tests.
     """
+
     BASE_PATTERN: str = ""
     MODEL: type[Model]
     DATA_TO_DEFAULT_OBJ: Dict

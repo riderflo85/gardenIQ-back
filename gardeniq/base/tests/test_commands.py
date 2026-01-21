@@ -30,7 +30,7 @@ class TestCommands:
         "app_name, model_obj",
         [
             ("orderlg", [Argument, Order]),
-            ("base", [Status])
+            ("base", [Status]),
         ],
     )
     def test_seed_with_app_name(self, app_name, model_obj):

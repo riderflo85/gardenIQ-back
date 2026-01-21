@@ -43,5 +43,9 @@ class Argument(
         default=False, verbose_name="is option", help_text="A option is a argument without value like `--verbose`."
     )
 
+    class Meta:
+        verbose_name = "argument"
+        verbose_name_plural = "arguments"
+
     def __str__(self) -> str:
         return f"Argument `{self.slug}` {self.if_enabled()}"

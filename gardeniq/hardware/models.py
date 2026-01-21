@@ -60,6 +60,10 @@ class Device(NameMixinModel, OptionalDescriptionMixinModel):
         help_text="Indicates if the device requires a firmware upgrade.",
     )
 
+    class Meta:
+        verbose_name = "device"
+        verbose_name_plural = "devices"
+
     def __str__(self) -> str:
         return f"Device `{self.name}` : {self.uid} : {self.path}"
 

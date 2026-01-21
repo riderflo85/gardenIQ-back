@@ -9,7 +9,6 @@ router.register(
     r"status",
     StatusAPIModelView,
     basename="status",
-
 )
 
 urlpatterns = router.urls

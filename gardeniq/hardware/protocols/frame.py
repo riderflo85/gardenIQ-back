@@ -102,11 +102,7 @@ class Frame:
             bool: True if the calculated checksum matches the expected checksum,
                   False otherwise.
         """
-        if (
-            not self.from_device
-            or not self.source_frame_from_device
-            or not self.checksum
-        ):
+        if not self.from_device or not self.source_frame_from_device or not self.checksum:
             return False
 
         # explain int(checksum_part, 16):
@@ -124,19 +120,10 @@ class Frame:
         else:
             found_versions = False
 
-        return (
-            self.from_device
-            and self.frame_type is FrameType.ACK
-            and self.command_id == 0
-            and found_versions
-        )
+        return self.from_device and self.frame_type is FrameType.ACK and self.command_id == 0 and found_versions
 
     def _is_order_response(self) -> bool:
-        return (
-            self.from_device
-            and self.frame_type is FrameType.ACK
-            and self.command_id > 0
-        )
+        return self.from_device and self.frame_type is FrameType.ACK and self.command_id > 0
 
     def is_order_response_with_data(self) -> bool:
         return self._is_order_response() and self.ok_data is not None

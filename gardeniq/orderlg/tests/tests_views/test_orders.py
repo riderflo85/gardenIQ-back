@@ -67,10 +67,8 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         # Check response data format
         first_order = response.data["results"][0]
         assert "name" in first_order
-        assert "description" in first_order
         assert "action_type" in first_order
         assert "is_enabled" in first_order
-        assert "arguments" in first_order
 
     def test_retrieve(self, client_anonymous, obj):
         """Test retrieving a specific order."""

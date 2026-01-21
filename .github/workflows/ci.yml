@@ -35,7 +35,7 @@ jobs:
 
       # 4. Check code formatting with black
       - name: Run black check
-        run: black --check .
+        run: black --check ./gardeniq
 
       # 5. Check imports with isort (mode check only)
       - name: Run isort check

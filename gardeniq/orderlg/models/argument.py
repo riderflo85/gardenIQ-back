@@ -46,6 +46,14 @@ class Argument(
     class Meta:
         verbose_name = "argument"
         verbose_name_plural = "arguments"
+        # It's a custom meta attribut to define available fields to send with LG_INIT frame type.
+        fields_for_frame = (
+            "pk",
+            "slug",
+            "value_type",
+            "required",
+            "is_option",
+        )
 
     def __str__(self) -> str:
         return f"Argument `{self.slug}` {self.if_enabled()}"

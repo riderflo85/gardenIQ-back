@@ -3,6 +3,8 @@ from typing import List
 from typing import Optional
 
 from gardeniq.base.utils import GardenEnum
+from gardeniq.orderlg.models import Argument
+from gardeniq.orderlg.models import Order
 
 from .errors import CommandError
 from .settings import pattern_recv_frame_version
@@ -15,11 +17,13 @@ class FrameType(GardenEnum):
     - CMD: Command frame — carries instructions or actions to be executed
     - PING: Keep-alive / heartbeat frame used to verify connectivity
     - ACK: Acknowledgement frame indicating successful receipt or processing
+    - LG_INIT: Sending initial order language to the device (used during setup). (All Order objects)
     """
 
     CMD = "CMD"
     PING = "PING"
     ACK = "ACK"
+    LG_INIT = "LG_INIT"
 
 
 class CommandState(GardenEnum):
@@ -31,10 +35,14 @@ class CommandState(GardenEnum):
 class Frame:
     frame_type: FrameType
     device_uid: str
-    command_id: int
+    command_id: int  # If -1 -> LG_INIT frame / If 0 -> Ping frame / If >0 -> Order command id
     command_slug: str
     args_values: List[str]
     from_device: bool = False
+
+    # Fields only present when command_id = -1
+    model: Optional[Argument | Order] = None
+    fields_values: List[str] = []
 
     # Fields only present when from_device=True
     command_state: Optional[CommandState] = None  # State of the command on device
@@ -52,16 +60,22 @@ class Frame:
         This method is automatically called after the dataclass __init__ method.
         It ensures that if the frame is from a device, both the checksum and
         source_frame_from_device attributes are provided.
+        It also ensures that if the command_id is -1, both the model and attribute are provided.
 
         Raises:
             ValueError: If from_device is True and checksum is None.
             ValueError: If from_device is True and source_frame_from_device is None.
+            ValueError: If command_id is -1 and model is None.
         """
         if self.from_device:
             if self.checksum is None:
                 raise ValueError("checksum must be provided if from_device is True")
             if self.source_frame_from_device is None:
                 raise ValueError("source_frame_from_device must be provided if from_device is True")
+
+        if self.command_id == -1:
+            if self.model is None:
+                raise ValueError("model must be provided if command_id is -1")
 
     @staticmethod
     def build_checksum(data: bytes) -> int:
@@ -130,6 +144,9 @@ class Frame:
 
     def is_order_response_without_data(self) -> bool:
         return self._is_order_response() and self.ok_data is None
+
+    def is_init_response(self) -> bool:
+        return self.from_device and self.frame_type is FrameType.ACK and self.command_id == -1
 
     def has_response_error(self) -> bool:
         return self.from_device and self.command_state is CommandState.ERROR

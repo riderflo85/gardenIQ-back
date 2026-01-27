@@ -152,6 +152,7 @@ class FrameParser:
             The conditional frame part varies based on frame type:
             - CMD with command_id > 0 and command_slug: "command_id command_slug args"
             - CMD with command_id > 0 (no slug): "command_id args"
+            - LG_INIT with command_id = -1: "-1 model_name field1;field2;..."
             - PING: "0"
             - Other types: empty string
         """
@@ -167,6 +168,10 @@ class FrameParser:
             case (FrameType.CMD, pk, _) if pk > 0:
                 args_str = ",".join(frame_obj.args_values)
                 conditionnal_frame = f"{pk} {args_str}"
+            case (FrameType.LG_INIT, pk, _) if pk == -1:
+                model_name = frame_obj.model.__name__ if frame_obj.model else "UnknownModel"
+                f_values = ";".join(frame_obj.fields_values)
+                conditionnal_frame = f"{pk} {model_name} {f_values}"
             case (FrameType.PING, _, _):
                 conditionnal_frame = "0"
             case (_, _, _):

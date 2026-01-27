@@ -66,6 +66,8 @@ class FrameHandler:
         # Route to appropriate handler
         if frame.is_ping_response():
             self._handle_ping_response(frame)
+        elif frame.is_init_response():
+            self._handle_lg_init_response(frame)
         elif frame.is_order_response_with_data():
             self._handle_response_with_data(frame)
         elif frame.is_order_response_without_data():
@@ -92,6 +94,10 @@ class FrameHandler:
 
         if frame.gd_fw_version and frame.mp_fw_version:
             device.set_firmware_versions(frame.gd_fw_version, frame.mp_fw_version)
+
+    def _handle_lg_init_response(self, frame: Frame) -> None:
+        # TODO: refresh the initial queue with langage to enable send next Order object.
+        pass
 
     def _handle_response_with_data(self, frame: Frame) -> None:
         # TODO: register the device response data into log system

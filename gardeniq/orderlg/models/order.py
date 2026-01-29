@@ -45,13 +45,6 @@ class Order(
     class Meta:
         verbose_name = "order"
         verbose_name_plural = "orders"
-        # It's a custom meta attribut to define available fields to send with LG_INIT frame type.
-        fields_for_frame = (
-            "pk",
-            "slug",
-            "action_type",
-            "arguments",
-        )
 
     def __str__(self) -> str:
         return f"Order `{self.name}` {self.if_enabled()}"

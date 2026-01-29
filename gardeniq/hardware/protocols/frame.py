@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from typing import List
+from typing import Literal
 from typing import Optional
+from typing import Tuple
 
 from gardeniq.base.utils import GardenEnum
-from gardeniq.orderlg.models import Argument
-from gardeniq.orderlg.models import Order
 
 from .errors import CommandError
 from .settings import pattern_recv_frame_version
@@ -41,12 +41,13 @@ class Frame:
     from_device: bool = False
 
     # Fields only present when command_id = -1
-    model: Optional[Argument | Order] = None
-    fields_values: List[str] = []
+    model: Optional[Literal["Argument", "Order"]] = None
+    # The ... in Tuple[str, ...] indicates that the tuple can contain zero or more elements of type str.
+    fields_values: Tuple[str, ...] = ()
 
     # Fields only present when from_device=True
     command_state: Optional[CommandState] = None  # State of the command on device
-    ok_data: Optional[str] = None  # Data received from device when command sended is OK state
+    ok_data: Optional[str] = None  # Data received from device when command sent is OK state
     err_msg: Optional[CommandError] = None  # Error message if cmd_state is ERROR
     gd_fw_version: Optional[str] = None  # GardenIQ Firmware Version
     mp_fw_version: Optional[str] = None  # MicroPython Firmware Version
@@ -60,7 +61,8 @@ class Frame:
         This method is automatically called after the dataclass __init__ method.
         It ensures that if the frame is from a device, both the checksum and
         source_frame_from_device attributes are provided.
-        It also ensures that if the command_id is -1, both the model and attribute are provided.
+        It also ensures that if the command_id is -1 and the frame is not from a device,
+        both the model and attribute are provided.
 
         Raises:
             ValueError: If from_device is True and checksum is None.
@@ -73,7 +75,7 @@ class Frame:
             if self.source_frame_from_device is None:
                 raise ValueError("source_frame_from_device must be provided if from_device is True")
 
-        if self.command_id == -1:
+        if self.command_id == -1 and not self.from_device:
             if self.model is None:
                 raise ValueError("model must be provided if command_id is -1")
 

@@ -116,3 +116,72 @@ class TestFrameParser:
         # WHEN / THEN
         with pytest.raises(FrameParsingError, match="Cannot build frame from device frame."):
             FrameParser.parse_from_frame_klass(frame_obj)
+
+    def test_parse_from_frame_klass_lg_init_with_model(self):
+        # GIVEN
+        frame_obj = Frame(
+            frame_type=FrameType.LG_INIT,
+            device_uid="device-42",
+            command_id=-1,
+            command_slug="init",
+            args_values=[],
+            model="Order",
+            fields_values=("1", "get_temp", "get"),
+        )
+
+        # WHEN
+        built = FrameParser.parse_from_frame_klass(frame_obj)
+
+        # THEN
+        conditional = "-1 Order 1;get_temp;get"
+        expected_frame = f"{STX} {frame_obj.frame_type.value} {frame_obj.device_uid} {conditional} {ETX}"
+        expected_checksum = Frame.build_checksum(expected_frame.encode())
+        assert built == f"{expected_frame} {expected_checksum:02X}\n"
+
+    def test_parse_from_frame_klass_ping(self):
+        # GIVEN
+        frame_obj = Frame(
+            frame_type=FrameType.PING,
+            device_uid="device-01",
+            command_id=0,
+            command_slug="ping",
+            args_values=[],
+        )
+
+        # WHEN
+        built = FrameParser.parse_from_frame_klass(frame_obj)
+
+        # THEN
+        expected_frame = f"{STX} {frame_obj.frame_type.value} {frame_obj.device_uid} 0 {ETX}"
+        expected_checksum = Frame.build_checksum(expected_frame.encode())
+        assert built == f"{expected_frame} {expected_checksum:02X}\n"
+
+    def test_parse_from_device_init_response_ok(self):
+        # GIVEN
+        recv = f"{STX} ACK device-77 -1 OK {ETX} 5A\n"
+
+        # WHEN
+        frame = FrameParser.parse_from_device(recv)
+
+        # THEN
+        assert frame.from_device is True
+        assert frame.device_uid == "device-77"
+        assert frame.command_id == -1
+        assert frame.command_state is CommandState.OK
+        assert frame.frame_type is FrameType.ACK
+        assert frame.ok_data is None
+        assert frame.err_msg is None
+
+    def test_parse_from_device_init_response_error(self):
+        # GIVEN
+        recv = f"{STX} ACK device-88 -1 ERR {CommandError.UNKNOW_CMD.value} {ETX} BB\n"
+
+        # WHEN
+        frame = FrameParser.parse_from_device(recv)
+
+        # THEN
+        assert frame.from_device is True
+        assert frame.command_id == -1
+        assert frame.command_state is CommandState.ERROR
+        assert frame.err_msg is CommandError.UNKNOW_CMD
+        assert frame.ok_data is None

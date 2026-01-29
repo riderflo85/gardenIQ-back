@@ -107,3 +107,70 @@ class TestFrameModel:
 
         # WHEN / THEN
         assert frame.has_response_error() is True
+
+    def test_frame_with_command_id_minus_one_requires_model(self):
+        # GIVEN / WHEN / THEN
+        with pytest.raises(ValueError, match="model must be provided if command_id is -1"):
+            Frame(
+                frame_type=FrameType.LG_INIT,
+                device_uid="DEV-001",
+                command_id=-1,
+                command_slug="init",
+                args_values=[],
+            )
+
+    def test_frame_with_model_and_fields_values_for_lg_init(self):
+        # GIVEN
+        fields = ("field1", "field2")
+
+        # WHEN
+        frame = Frame(
+            frame_type=FrameType.LG_INIT,
+            device_uid="DEV-001",
+            command_id=-1,
+            command_slug="init",
+            args_values=[],
+            model="Order",
+            fields_values=fields,
+        )
+
+        # THEN
+        assert frame.model == "Order"
+        assert frame.fields_values == fields
+        assert frame.command_id == -1
+
+    def test_is_init_response_returns_true_for_init_ack(self, device_frame_factory):
+        # GIVEN
+        frame = Frame(**device_frame_factory(command_id=-1, frame_type=FrameType.ACK), model="Order")
+
+        # WHEN / THEN
+        assert frame.is_init_response() is True
+
+    def test_is_init_response_returns_false_for_ping(self, device_frame_factory):
+        # GIVEN
+        frame = Frame(**device_frame_factory(command_id=0, frame_type=FrameType.ACK))
+
+        # WHEN / THEN
+        assert frame.is_init_response() is False
+
+    def test_is_init_response_returns_false_for_order_response(self, device_frame_factory):
+        # GIVEN
+        frame = Frame(**device_frame_factory(command_id=5, frame_type=FrameType.ACK))
+
+        # WHEN / THEN
+        assert frame.is_init_response() is False
+
+    def test_is_init_response_returns_false_when_not_from_device(self):
+        # GIVEN
+        frame = Frame(
+            frame_type=FrameType.LG_INIT,
+            device_uid="DEV-001",
+            command_id=-1,
+            command_slug="",
+            args_values=[],
+            from_device=False,
+            model="Order",
+        )
+
+        # WHEN / THEN
+        assert frame.is_init_response() is False

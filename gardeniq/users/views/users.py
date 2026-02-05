@@ -41,7 +41,11 @@ class UserAPIModelView(ModelViewSet):
         """
         Different permissions based on action.
         """
-        if self.action == "retrieve":
+        # Check if this is a request to /me/ endpoint (for any HTTP method)
+        if self.action == "me" or (hasattr(self, 'request') and '/me/' in self.request.path):
+            # Any authenticated user can access their own profile
+            permission_classes = [IsAuthenticated]
+        elif self.action == "retrieve":
             # Owner or admin
             permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
         elif self.action == "update":
@@ -67,7 +71,7 @@ class UserAPIModelView(ModelViewSet):
             return UserReadOnlySerializer
         return UserSerializer
 
-    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=["get"])
     def me(self, request):
         """
         Get the information of the authenticated user.

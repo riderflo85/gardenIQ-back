@@ -8,16 +8,14 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.reverse import reverse
-from rest_framework.test import APIClient
-from django.contrib.auth.models import Group, Permission
-from django.contrib.contenttypes.models import ContentType
-from unittest.mock import patch
+
+from gardeniq.base.utils.tests import ViewSetTestMixin
 
 User = get_user_model()
 
 
 @pytest.fixture(autouse=True)
-def disable_throttling():
+def disable_throttling(monkeypatch):
     """
     Disable throttling for all tests by default.
 
@@ -25,127 +23,15 @@ def disable_throttling():
     due to rate limiting. Individual tests can re-enable throttling if needed
     to test throttle-specific behavior.
     """
-    with patch('gardeniq.users.views.auth.LoginThrottle.allow_request', return_value=True):
-        yield
-
-
-@pytest.fixture
-def api_client():
-    """Return a DRF API client."""
-    return APIClient()
-
-
-@pytest.fixture
-def user_content_type():
-    """Return the content type for User model."""
-    return ContentType.objects.get_for_model(User)
-
-
-@pytest.fixture
-def test_permission(user_content_type):
-    """Create a test permission."""
-    return Permission.objects.create(
-        codename='test_permission',
-        name='Test Permission',
-        content_type=user_content_type
+    monkeypatch.setattr(
+        'gardeniq.users.views.auth.LoginThrottle.allow_request',
+        lambda self, request, view: True
     )
+    yield
 
-
-@pytest.fixture
-def test_permission_2(user_content_type):
-    """Create a second test permission."""
-    return Permission.objects.create(
-        codename='test_permission_2',
-        name='Test Permission 2',
-        content_type=user_content_type
-    )
-
-
-@pytest.fixture
-def test_group(test_permission):
-    """Create a test group with permissions."""
-    group = Group.objects.create(name='Test Group')
-    group.permissions.add(test_permission)
-    return group
-
-
-@pytest.fixture
-def test_group_2(test_permission_2):
-    """Create a second test group with permissions."""
-    group = Group.objects.create(name='Test Group 2')
-    group.permissions.add(test_permission_2)
-    return group
-
-
-@pytest.fixture
-def regular_user():
-    """Create a regular non-staff user."""
-    return User.objects.create_user(
-        username='regularuser',
-        email='regular@example.com',
-        password='RegularPass123!',
-        first_name='Regular',
-        last_name='User'
-    )
-
-
-@pytest.fixture
-def admin_user():
-    """Create an admin user with staff privileges."""
-    return User.objects.create_user(
-        username='adminuser',
-        email='admin@example.com',
-        password='AdminPass123!',
-        first_name='Admin',
-        last_name='User',
-        is_staff=True,
-        is_superuser=True
-    )
-
-
-@pytest.fixture
-def regular_user_with_groups(regular_user, test_group, test_permission):
-    """Create a regular user with groups and permissions."""
-    regular_user.groups.add(test_group)
-    regular_user.user_permissions.add(test_permission)
-    return regular_user
-
-
-@pytest.fixture
-def authenticated_client(api_client, regular_user):
-    """Return an authenticated API client for a regular user."""
-    api_client.force_authenticate(user=regular_user)
-    return api_client
-
-
-@pytest.fixture
-def admin_client(api_client, admin_user):
-    """Return an authenticated API client for an admin user."""
-    api_client.force_authenticate(user=admin_user)
-    return api_client
-
-
-@pytest.fixture
-def unauthenticated_client(api_client):
-    """Return an unauthenticated API client."""
-    api_client.force_authenticate(user=None)
-    return api_client
-
-
-@pytest.fixture
-def user_payload():
-    """Return a valid user creation payload."""
-    return {
-        'username': 'newuser',
-        'password': 'NewUserPass123!',
-        'password_confirm': 'NewUserPass123!',
-        'email': 'newuser@example.com',
-        'first_name': 'New',
-        'last_name': 'User'
-    }
 
 @pytest.mark.django_db
-class TestLoginView:
+class TestLoginView(ViewSetTestMixin):
     """Tests for user login (POST /api/auth/login/)."""
 
     def test_login_with_valid_credentials(self, api_client, regular_user):
@@ -267,16 +153,11 @@ class TestLoginView:
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_login_throttling_triggered(self, api_client, regular_user):
+    def test_login_throttling_triggered(self, api_client, regular_user, monkeypatch):
         """Test that login is throttled after too many attempts."""
         # GIVEN
         # Mock the throttle check method to simulate throttling
-        from unittest.mock import MagicMock
         from gardeniq.users.views.auth import LoginView
-
-        # Create a mock that returns False (throttled)
-        mock_throttle = MagicMock()
-        mock_throttle.allow_request.return_value = False
 
         url = reverse('knox_login')
         credentials = {
@@ -285,12 +166,14 @@ class TestLoginView:
         }
 
         # WHEN
-        # Patch the throttle classes directly on the view
-        with patch.object(LoginView, 'throttle_classes', [type('MockThrottle', (), {
+        # Create a mock throttle class and patch it on the view
+        mock_throttle_class = type('MockThrottle', (), {
             'allow_request': lambda self, request, view: False,
             'wait': lambda self: 60
-        })]):
-            response = api_client.post(url, data=credentials, format='json')
+        })
+        monkeypatch.setattr(LoginView, 'throttle_classes', [mock_throttle_class])
+
+        response = api_client.post(url, data=credentials, format='json')
 
         # THEN
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
@@ -313,7 +196,7 @@ class TestLoginView:
         assert response.status_code == status.HTTP_200_OK
         # Verify token can be used for authentication
         api_client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
-        me_url = reverse('auth-me')
+        me_url = reverse('users-me')
         me_response = api_client.get(me_url)
         assert me_response.status_code == status.HTTP_200_OK
         assert me_response.data['username'] == 'regularuser'
@@ -340,14 +223,14 @@ class TestLoginView:
 
 
 @pytest.mark.django_db
-class TestUserAuthViewSet:
+class TestUserAuthViewSet(ViewSetTestMixin):
     """Tests for UserAuthViewSet (/api/auth/me/)."""
 
     def test_get_authenticated_user_profile(self, authenticated_client, regular_user):
         """Test retrieving authenticated user's profile."""
         # GIVEN
         # Authenticated user
-        url = reverse('auth-me')
+        url = reverse('users-me')
 
         # WHEN
         response = authenticated_client.get(url)
@@ -367,7 +250,7 @@ class TestUserAuthViewSet:
         """Test retrieving admin user's profile."""
         # GIVEN
         # Authenticated admin user
-        url = reverse('auth-me')
+        url = reverse('users-me')
 
         # WHEN
         response = admin_client.get(url)
@@ -384,7 +267,7 @@ class TestUserAuthViewSet:
         """Test that user profile includes groups."""
         # GIVEN
         # Authenticated user with groups
-        url = reverse('auth-me')
+        url = reverse('users-me')
 
         # WHEN
         response = authenticated_client.get(url)
@@ -401,7 +284,7 @@ class TestUserAuthViewSet:
         """Test that user profile includes permissions."""
         # GIVEN
         # Authenticated user with permissions
-        url = reverse('auth-me')
+        url = reverse('users-me')
 
         # WHEN
         response = authenticated_client.get(url)
@@ -419,7 +302,7 @@ class TestUserAuthViewSet:
         """Test that unauthenticated user cannot access /me endpoint."""
         # GIVEN
         # Unauthenticated client
-        url = reverse('auth-me')
+        url = reverse('users-me')
 
         # WHEN
         response = unauthenticated_client.get(url)
@@ -431,7 +314,7 @@ class TestUserAuthViewSet:
         """Test that /me endpoint does not support POST/PUT/DELETE."""
         # GIVEN
         # Authenticated user
-        url = reverse('auth-me')
+        url = reverse('users-me')
         data = {'username': 'hacked'}
 
         # WHEN
@@ -446,7 +329,7 @@ class TestUserAuthViewSet:
 
 
 @pytest.mark.django_db
-class TestLogoutView:
+class TestLogoutView(ViewSetTestMixin):
     """Tests for logout functionality."""
 
     def test_logout_authenticated_user(self, api_client, regular_user):
@@ -472,7 +355,7 @@ class TestLogoutView:
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
         # Verify token is no longer valid
-        me_url = reverse('auth-me')
+        me_url = reverse('users-me')
         me_response = api_client.get(me_url)
         assert me_response.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -490,7 +373,7 @@ class TestLogoutView:
 
 
 @pytest.mark.django_db
-class TestLogoutAllView:
+class TestLogoutAllView(ViewSetTestMixin):
     """Tests for logging out all sessions."""
 
     def test_logoutall_invalidates_all_tokens(self, api_client, regular_user):
@@ -519,7 +402,7 @@ class TestLogoutAllView:
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
         # Verify both tokens are invalid
-        me_url = reverse('auth-me')
+        me_url = reverse('users-me')
 
         api_client.credentials(HTTP_AUTHORIZATION=f'Token {token1}')
         me1_response = api_client.get(me_url)

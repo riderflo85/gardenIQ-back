@@ -6,10 +6,8 @@ Uses pytest and the GIVEN-WHEN-THEN pattern for clarity.
 """
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group, Permission
-from django.contrib.contenttypes.models import ContentType
-from django.test import RequestFactory
 
+from gardeniq.base.utils.tests import ViewSetTestMixin
 from gardeniq.users.serializers.users import (
     UserSerializer,
     UserReadOnlySerializer,
@@ -19,97 +17,8 @@ from gardeniq.users.serializers.users import (
 User = get_user_model()
 
 
-# Fixtures
-@pytest.fixture
-def mock_request_factory():
-    """
-    Factory fixture to create mock Django request objects with authenticated users.
-
-    Returns a callable that accepts a user and returns a mock request with that user.
-    """
-    def _create_request(user):
-        """Create a mock request with the given user."""
-        factory = RequestFactory()
-        request = factory.get('/')
-        request.user = user
-        return request
-    return _create_request
-
-
-@pytest.fixture
-def user_content_type():
-    """Return the content type for User model."""
-    return ContentType.objects.get_for_model(User)
-
-
-@pytest.fixture
-def test_permission(user_content_type):
-    """Create a test permission."""
-    return Permission.objects.create(
-        codename='test_permission',
-        name='Test Permission',
-        content_type=user_content_type
-    )
-
-
-@pytest.fixture
-def test_permission_2(user_content_type):
-    """Create a second test permission."""
-    return Permission.objects.create(
-        codename='test_permission_2',
-        name='Test Permission 2',
-        content_type=user_content_type
-    )
-
-
-@pytest.fixture
-def test_group(test_permission):
-    """Create a test group with permissions."""
-    group = Group.objects.create(name='Test Group')
-    group.permissions.add(test_permission)
-    return group
-
-
-@pytest.fixture
-def test_group_2(test_permission_2):
-    """Create a second test group with permissions."""
-    group = Group.objects.create(name='Test Group 2')
-    group.permissions.add(test_permission_2)
-    return group
-
-
-@pytest.fixture
-def regular_user():
-    """Create a regular non-staff user."""
-    return User.objects.create_user(
-        username='regularuser',
-        email='regular@example.com',
-        password='RegularPass123!'
-    )
-
-
-@pytest.fixture
-def admin_user():
-    """Create an admin user with staff privileges."""
-    return User.objects.create_user(
-        username='adminuser',
-        email='admin@example.com',
-        password='AdminPass123!',
-        is_staff=True,
-        is_superuser=True
-    )
-
-
-@pytest.fixture
-def regular_user_with_groups(regular_user, test_group, test_permission):
-    """Create a regular user with groups and permissions."""
-    regular_user.groups.add(test_group)
-    regular_user.user_permissions.add(test_permission)
-    return regular_user
-
-
 @pytest.mark.django_db
-class TestUserSerializerCreate:
+class TestUserSerializerCreate(ViewSetTestMixin):
     """Tests for creating users with UserSerializer."""
 
     def test_create_user_with_required_fields(self, mock_request_factory, admin_user):
@@ -371,7 +280,7 @@ class TestUserSerializerCreate:
 
 
 @pytest.mark.django_db
-class TestUserSerializerUpdate:
+class TestUserSerializerUpdate(ViewSetTestMixin):
     """Tests for updating users with UserSerializer."""
 
     def test_update_user_basic_fields(self, mock_request_factory, regular_user):
@@ -647,7 +556,7 @@ class TestUserSerializerUpdate:
 
 
 @pytest.mark.django_db
-class TestUserSerializerValidation:
+class TestUserSerializerValidation(ViewSetTestMixin):
     """Tests for UserSerializer validation and field constraints."""
 
     def test_group_ids_validation_non_admin_fails(
@@ -741,7 +650,7 @@ class TestUserSerializerValidation:
 
 
 @pytest.mark.django_db
-class TestUserReadOnlySerializer:
+class TestUserReadOnlySerializer(ViewSetTestMixin):
     """Tests for UserReadOnlySerializer."""
 
     def test_readonly_serializer_representation(

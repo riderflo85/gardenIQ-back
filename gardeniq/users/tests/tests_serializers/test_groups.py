@@ -1,217 +1,287 @@
-from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.auth.models import Permission
-from django.contrib.contenttypes.models import ContentType
-from django.test import TestCase
 
 from rest_framework.relations import ManyRelatedField
 
+import pytest
+
+from gardeniq.base.utils.tests import ViewSetTestMixin
 from gardeniq.users.serializers.groups import GroupSerializer
 
-User = get_user_model()
 
-
-class GroupSerializerTestCase(TestCase):
+@pytest.mark.django_db
+class TestGroupSerializer(ViewSetTestMixin):
     """Test cases for GroupSerializer"""
 
-    def setUp(self):
-        """Set up test data"""
-        self.content_type = ContentType.objects.get_for_model(User)
-
-        # Create test permissions
-        self.permission1 = Permission.objects.create(
-            codename="test_group_permission1", name="Can test group permission 1", content_type=self.content_type
-        )
-        self.permission2 = Permission.objects.create(
-            codename="test_group_permission2", name="Can test group permission 2", content_type=self.content_type
-        )
-
-        # Create test group
-        self.group = Group.objects.create(name="Test Group")
-        self.group.permissions.add(self.permission1)
-
-    def test_group_serializer_representation(self):
+    def test_group_serializer_representation(self, test_group, test_permission):
         """Test group serializer representation"""
-        serializer = GroupSerializer(instance=self.group)
+        # GIVEN: A group with a permission
+        group = test_group
+        permission = test_permission
+
+        # WHEN: Serializing the group
+        serializer = GroupSerializer(instance=group)
         data = serializer.data
 
-        self.assertEqual(data["id"], self.group.id)
-        self.assertEqual(data["name"], self.group.name)
-        self.assertIn("permissions", data)
-        self.assertEqual(len(data["permissions"]), 1)
-        self.assertEqual(data["permissions"][0]["id"], self.permission1.id)
+        # THEN: All fields are correctly represented
+        assert data["id"] == group.id
+        assert data["name"] == group.name
+        assert "permissions" in data
+        assert len(data["permissions"]) == 1
+        assert data["permissions"][0]["id"] == permission.id
 
-    def test_group_serializer_with_multiple_permissions(self):
+    def test_group_serializer_with_multiple_permissions(self, test_group, test_permission, test_permission_2):
         """Test group serializer with multiple permissions"""
-        self.group.permissions.add(self.permission2)
+        # GIVEN: A group with multiple permissions
+        group = test_group
+        permission1 = test_permission
+        permission2 = test_permission_2
+        group.permissions.add(permission2)
 
-        serializer = GroupSerializer(instance=self.group)
+        # WHEN: Serializing the group
+        serializer = GroupSerializer(instance=group)
         data = serializer.data
 
-        self.assertEqual(len(data["permissions"]), 2)
+        # THEN: All permissions are present
+        assert len(data["permissions"]) == 2
         permission_codenames = [p["codename"] for p in data["permissions"]]
-        self.assertIn("test_group_permission1", permission_codenames)
-        self.assertIn("test_group_permission2", permission_codenames)
+        assert permission1.codename in permission_codenames
+        assert permission2.codename in permission_codenames
 
     def test_group_serializer_with_no_permissions(self):
         """Test group serializer with no permissions"""
+        # GIVEN: A group with no permissions
         empty_group = Group.objects.create(name="Empty Group")
 
+        # WHEN: Serializing the group
         serializer = GroupSerializer(instance=empty_group)
         data = serializer.data
 
-        self.assertEqual(data["name"], "Empty Group")
-        self.assertEqual(len(data["permissions"]), 0)
+        # THEN: Group has no permissions
+        assert data["name"] == "Empty Group"
+        assert len(data["permissions"]) == 0
 
-    def test_group_serializer_permissions_readonly(self):
+    def test_group_serializer_permissions_readonly(self, test_group):
         """Test that permissions field is read-only"""
-        serializer = GroupSerializer(instance=self.group)
+        # GIVEN: A group instance
+        group = test_group
 
-        self.assertTrue(serializer.fields["permissions"].read_only)
+        # WHEN: Creating a serializer
+        serializer = GroupSerializer(instance=group)
 
-    def test_group_serializer_permission_ids_writeonly(self):
+        # THEN: permissions field is read-only
+        assert serializer.fields["permissions"].read_only is True
+
+    def test_group_serializer_permission_ids_writeonly(self, test_group):
         """Test that permission_ids field is write-only"""
-        serializer = GroupSerializer(instance=self.group)
+        # GIVEN: A group instance
+        group = test_group
 
-        self.assertTrue(serializer.fields["permission_ids"].write_only)
-        # permission_ids should not appear in serialized data
+        # WHEN: Creating a serializer and accessing data
+        serializer = GroupSerializer(instance=group)
         data = serializer.data
-        self.assertNotIn("permission_ids", data)
 
-    def test_group_serializer_id_readonly(self):
+        # THEN: permission_ids is write-only and not in serialized data
+        assert serializer.fields["permission_ids"].write_only is True
+        assert "permission_ids" not in data
+
+    def test_group_serializer_id_readonly(self, test_group):
         """Test that id field is read-only"""
-        serializer = GroupSerializer(instance=self.group)
+        # GIVEN: A group instance
+        group = test_group
 
-        self.assertTrue(serializer.fields["id"].read_only)
+        # WHEN: Creating a serializer
+        serializer = GroupSerializer(instance=group)
 
-    def test_group_serializer_cannot_create(self):
+        # THEN: id field is read-only
+        assert serializer.fields["id"].read_only is True
+
+    def test_group_serializer_cannot_create(self, test_permission):
         """Test that group serializer cannot create objects"""
-        data = {"name": "New Group", "permission_ids": [self.permission1.id]}
+        # GIVEN: Data for creating a new group
+        permission = test_permission
+        data = {"name": "New Group", "permission_ids": [permission.id]}
+
+        # WHEN: Attempting to create a group using the serializer
         serializer = GroupSerializer(data=data)
 
-        with self.assertRaises(NotImplementedError) as context:
+        # THEN: NotImplementedError is raised
+        with pytest.raises(NotImplementedError) as exc_info:
             if serializer.is_valid():
                 serializer.save()
 
-        self.assertIn("does not support creation", str(context.exception))
+        assert "does not support creation" in str(exc_info.value)
 
-    def test_group_serializer_cannot_update(self):
+    def test_group_serializer_cannot_update(self, test_group, test_permission_2):
         """Test that group serializer cannot update objects"""
-        data = {"name": "Updated Group", "permission_ids": [self.permission2.id]}
-        serializer = GroupSerializer(instance=self.group, data=data, partial=True)
+        # GIVEN: A group instance and update data
+        group = test_group
+        permission2 = test_permission_2
+        data = {"name": "Updated Group", "permission_ids": [permission2.id]}
 
-        with self.assertRaises(NotImplementedError) as context:
+        # WHEN: Attempting to update the group using the serializer
+        serializer = GroupSerializer(instance=group, data=data, partial=True)
+
+        # THEN: NotImplementedError is raised
+        with pytest.raises(NotImplementedError) as exc_info:
             if serializer.is_valid():
                 serializer.save()
 
-        self.assertIn("does not support update", str(context.exception))
+        assert "does not support update" in str(exc_info.value)
 
-    def test_group_serializer_many(self):
+    def test_group_serializer_many(self, test_group, test_group_2):
         """Test group serializer with many=True"""
-        group2 = Group.objects.create(name="Test Group 2")
-        group2.permissions.add(self.permission2)
+        # GIVEN: Multiple groups
+        group1 = test_group
+        group2 = test_group_2
 
-        groups = Group.objects.filter(id__in=[self.group.id, group2.id])
+        # WHEN: Serializing multiple groups with many=True
+        groups = Group.objects.filter(id__in=[group1.id, group2.id])
         serializer = GroupSerializer(groups, many=True)
         data = serializer.data
 
-        self.assertEqual(len(data), 2)
+        # THEN: All groups are correctly serialized
+        assert len(data) == 2
         group_names = [g["name"] for g in data]
-        self.assertIn("Test Group", group_names)
-        self.assertIn("Test Group 2", group_names)
+        assert group1.name in group_names
+        assert group2.name in group_names
 
-    def test_group_serializer_permissions_detail(self):
+    def test_group_serializer_permissions_detail(self, test_group):
         """Test that permissions are serialized with detail"""
-        serializer = GroupSerializer(instance=self.group)
+        # GIVEN: A group with permissions
+        group = test_group
+
+        # WHEN: Serializing the group
+        serializer = GroupSerializer(instance=group)
         data = serializer.data
 
+        # THEN: Permission details are included
         permission_data = data["permissions"][0]
-        self.assertIn("id", permission_data)
-        self.assertIn("name", permission_data)
-        self.assertIn("codename", permission_data)
-        self.assertIn("content_type", permission_data)
+        assert "id" in permission_data
+        assert "name" in permission_data
+        assert "codename" in permission_data
+        assert "content_type" in permission_data
 
-    def test_group_serializer_name_field(self):
+    def test_group_serializer_name_field(self, test_group):
         """Test that name field is writable"""
-        serializer = GroupSerializer(instance=self.group)
+        # GIVEN: A group instance
+        group = test_group
 
-        self.assertFalse(serializer.fields["name"].read_only)
+        # WHEN: Creating a serializer
+        serializer = GroupSerializer(instance=group)
 
-    def test_group_serializer_permission_ids_queryset(self):
+        # THEN: name field is not read-only
+        assert serializer.fields["name"].read_only is False
+
+    def test_group_serializer_permission_ids_queryset(self, test_group):
         """Test that permission_ids field has correct queryset"""
-        serializer = GroupSerializer(instance=self.group)
+        # GIVEN: A group instance
+        group = test_group
 
+        # WHEN: Creating a serializer and checking permission_ids field
+        serializer = GroupSerializer(instance=group)
         permission_ids_field = serializer.fields["permission_ids"]
-        # Check that queryset contains Permission objects
-        # ManyRelatedField wraps the actual field, access via child_relation
         queryset = permission_ids_field.child_relation.queryset
-        self.assertTrue(queryset.model == Permission)
 
-    def test_group_serializer_permission_ids_many(self):
+        # THEN: queryset contains Permission objects
+        assert queryset.model == Permission
+
+    def test_group_serializer_permission_ids_many(self, test_group):
         """Test that permission_ids field accepts many values"""
-        serializer = GroupSerializer(instance=self.group)
+        # GIVEN: A group instance
+        group = test_group
 
+        # WHEN: Creating a serializer and checking permission_ids field
+        serializer = GroupSerializer(instance=group)
         permission_ids_field = serializer.fields["permission_ids"]
-        # Check that it's a ManyRelatedField (which handles many=True)
-        self.assertIsInstance(permission_ids_field, ManyRelatedField)
 
-    def test_group_serializer_permission_ids_not_required(self):
+        # THEN: Field is a ManyRelatedField
+        assert isinstance(permission_ids_field, ManyRelatedField)
+
+    def test_group_serializer_permission_ids_not_required(self, test_group):
         """Test that permission_ids field is not required"""
-        serializer = GroupSerializer(instance=self.group)
+        # GIVEN: A group instance
+        group = test_group
 
+        # WHEN: Creating a serializer and checking permission_ids field
+        serializer = GroupSerializer(instance=group)
         permission_ids_field = serializer.fields["permission_ids"]
-        self.assertFalse(permission_ids_field.required)
 
-    def test_group_serializer_fields_count(self):
+        # THEN: Field is not required
+        assert permission_ids_field.required is False
+
+    def test_group_serializer_fields_count(self, test_group):
         """Test that group serializer has correct number of fields"""
-        serializer = GroupSerializer(instance=self.group)
+        # GIVEN: A group instance
+        group = test_group
 
+        # WHEN: Creating a serializer
+        serializer = GroupSerializer(instance=group)
+
+        # THEN: Only expected fields are present
         expected_fields = ["id", "name", "permissions", "permission_ids"]
-        self.assertEqual(set(serializer.fields.keys()), set(expected_fields))
+        assert set(serializer.fields.keys()) == set(expected_fields)
 
     def test_group_serializer_empty_queryset(self):
         """Test group serializer with empty queryset"""
+        # GIVEN: An empty group queryset
         groups = Group.objects.none()
+
+        # WHEN: Serializing the empty queryset
         serializer = GroupSerializer(groups, many=True)
         data = serializer.data
 
-        self.assertEqual(len(data), 0)
+        # THEN: Empty list is returned
+        assert len(data) == 0
 
     def test_group_serializer_with_null_instance(self):
         """Test group serializer with None instance"""
+        # GIVEN: A None instance
+        # WHEN: Creating a serializer with None
         serializer = GroupSerializer(instance=None)
-        # When instance is None, accessing .data returns an empty ReturnDict
-        # which behaves like an empty dict for read-only serializers
         data = serializer.data
 
-        # Verify the data structure is empty or has None/empty values
-        self.assertIsInstance(data, dict)
+        # THEN: Data is an empty dict-like structure
+        assert isinstance(data, dict)
 
-    def test_group_serializer_validation_with_valid_data(self):
+    def test_group_serializer_validation_with_valid_data(self, test_permission, test_permission_2):
         """Test that serializer validates correctly with valid data"""
-        data = {"name": "Valid Group", "permission_ids": [self.permission1.id, self.permission2.id]}
+        # GIVEN: Valid data with existing permission ids
+        permission1 = test_permission
+        permission2 = test_permission_2
+        data = {"name": "Valid Group", "permission_ids": [permission1.id, permission2.id]}
+
+        # WHEN: Validating the data
         serializer = GroupSerializer(data=data)
 
-        # Validation should pass even though save will fail
-        self.assertTrue(serializer.is_valid())
-        self.assertEqual(serializer.validated_data["name"], "Valid Group")
-        self.assertEqual(len(serializer.validated_data["permissions"]), 2)
+        # THEN: Validation passes and data is correctly mapped
+        assert serializer.is_valid() is True
+        assert serializer.validated_data["name"] == "Valid Group"
+        assert len(serializer.validated_data["permissions"]) == 2
 
     def test_group_serializer_validation_with_invalid_permission_ids(self):
         """Test that serializer validates with invalid permission IDs"""
-        data = {"name": "Invalid Group", "permission_ids": [99999]}  # Non-existent permission ID
+        # GIVEN: Data with non-existent permission ID
+        data = {"name": "Invalid Group", "permission_ids": [99999]}
+
+        # WHEN: Validating the data
         serializer = GroupSerializer(data=data)
 
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("permission_ids", serializer.errors)
+        # THEN: Validation fails with error on permission_ids
+        assert serializer.is_valid() is False
+        assert "permission_ids" in serializer.errors
 
-    def test_group_serializer_source_mapping(self):
+    def test_group_serializer_source_mapping(self, test_permission):
         """Test that permission_ids correctly maps to permissions"""
-        data = {"name": "Source Test Group", "permission_ids": [self.permission1.id]}
+        # GIVEN: Data with permission_ids
+        permission = test_permission
+        data = {"name": "Source Test Group", "permission_ids": [permission.id]}
+
+        # WHEN: Validating the data
         serializer = GroupSerializer(data=data)
 
-        self.assertTrue(serializer.is_valid())
-        # Check that permission_ids is mapped to 'permissions' in validated_data
-        self.assertIn("permissions", serializer.validated_data)
-        self.assertEqual(len(serializer.validated_data["permissions"]), 1)
-        self.assertEqual(serializer.validated_data["permissions"][0].id, self.permission1.id)
+        # THEN: permission_ids is mapped to permissions in validated_data
+        assert serializer.is_valid() is True
+        assert "permissions" in serializer.validated_data
+        assert len(serializer.validated_data["permissions"]) == 1
+        assert serializer.validated_data["permissions"][0].id == permission.id

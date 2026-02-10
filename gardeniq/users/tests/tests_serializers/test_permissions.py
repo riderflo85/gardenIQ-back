@@ -1,124 +1,153 @@
-from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.contrib.auth.models import Permission
-from django.contrib.contenttypes.models import ContentType
-from django.test import TestCase
 
+import pytest
+
+from gardeniq.base.utils.tests import ViewSetTestMixin
 from gardeniq.users.serializers.permissions import PermissionSerializer
 
-User = get_user_model()
 
-
-class PermissionSerializerTestCase(TestCase):
+@pytest.mark.django_db
+class TestPermissionSerializer(ViewSetTestMixin):
     """Test cases for PermissionSerializer"""
 
-    def setUp(self):
-        """Set up test data"""
-        self.content_type = ContentType.objects.get_for_model(User)
-
-        # Create test permission
-        self.permission = Permission.objects.create(
-            codename="test_permission", name="Can test permission", content_type=self.content_type
-        )
-
-    def test_permission_serializer_representation(self):
+    def test_permission_serializer_representation(self, test_permission):
         """Test permission serializer representation"""
-        serializer = PermissionSerializer(instance=self.permission)
+        # GIVEN: A permission instance
+        permission = test_permission
+
+        # WHEN: Serializing the permission
+        serializer = PermissionSerializer(instance=permission)
         data = serializer.data
 
-        self.assertEqual(data["id"], self.permission.id)
-        self.assertEqual(data["name"], self.permission.name)
-        self.assertEqual(data["codename"], self.permission.codename)
-        self.assertIn("content_type", data)
+        # THEN: All fields are correctly represented
+        assert data["id"] == permission.id
+        assert data["name"] == permission.name
+        assert data["codename"] == permission.codename
+        assert "content_type" in data
 
-    def test_permission_serializer_all_fields_readonly(self):
+    def test_permission_serializer_all_fields_readonly(self, test_permission):
         """Test that all fields in permission serializer are read-only"""
-        serializer = PermissionSerializer(instance=self.permission)
+        # GIVEN: A permission instance
+        permission = test_permission
 
-        self.assertTrue(serializer.fields["id"].read_only)
-        self.assertTrue(serializer.fields["name"].read_only)
-        self.assertTrue(serializer.fields["codename"].read_only)
-        self.assertTrue(serializer.fields["content_type"].read_only)
+        # WHEN: Creating a serializer with the permission
+        serializer = PermissionSerializer(instance=permission)
 
-    def test_permission_serializer_cannot_create(self):
+        # THEN: All fields are read-only
+        assert serializer.fields["id"].read_only is True
+        assert serializer.fields["name"].read_only is True
+        assert serializer.fields["codename"].read_only is True
+        assert serializer.fields["content_type"].read_only is True
+
+    def test_permission_serializer_cannot_create(self, user_content_type):
         """Test that permission serializer cannot create objects"""
-        data = {"name": "New Permission", "codename": "new_permission", "content_type": self.content_type.id}
+        # GIVEN: Data for creating a new permission
+        data = {"name": "New Permission", "codename": "new_permission", "content_type": user_content_type.id}
+
+        # WHEN: Attempting to create a permission using the serializer
         serializer = PermissionSerializer(data=data)
 
-        with self.assertRaises(NotImplementedError) as context:
+        # THEN: NotImplementedError is raised
+        with pytest.raises(NotImplementedError) as exc_info:
             if serializer.is_valid():
                 serializer.save()
 
-        self.assertIn("does not support creation", str(context.exception))
+        assert "does not support creation" in str(exc_info.value)
 
-    def test_permission_serializer_cannot_update(self):
+    def test_permission_serializer_cannot_update(self, test_permission):
         """Test that permission serializer cannot update objects"""
+        # GIVEN: A permission instance and update data
+        permission = test_permission
         data = {"name": "Updated Permission"}
-        serializer = PermissionSerializer(instance=self.permission, data=data, partial=True)
 
-        with self.assertRaises(NotImplementedError) as context:
+        # WHEN: Attempting to update the permission using the serializer
+        serializer = PermissionSerializer(instance=permission, data=data, partial=True)
+
+        # THEN: NotImplementedError is raised
+        with pytest.raises(NotImplementedError) as exc_info:
             if serializer.is_valid():
                 serializer.save()
 
-        self.assertIn("does not support update", str(context.exception))
+        assert "does not support update" in str(exc_info.value)
 
-    def test_permission_serializer_many(self):
+    def test_permission_serializer_many(self, test_permission, test_permission_2):
         """Test permission serializer with many=True"""
-        permission2 = Permission.objects.create(
-            codename="test_permission2", name="Can test permission 2", content_type=self.content_type
-        )
+        # GIVEN: Multiple permissions
+        permission1 = test_permission
+        permission2 = test_permission_2
 
-        permissions = Permission.objects.filter(id__in=[self.permission.id, permission2.id])
+        # WHEN: Serializing multiple permissions with many=True
+        permissions = Permission.objects.filter(id__in=[permission1.id, permission2.id])
         serializer = PermissionSerializer(permissions, many=True)
         data = serializer.data
 
-        self.assertEqual(len(data), 2)
+        # THEN: All permissions are correctly serialized
+        assert len(data) == 2
         codenames = [p["codename"] for p in data]
-        self.assertIn("test_permission", codenames)
-        self.assertIn("test_permission2", codenames)
+        assert permission1.codename in codenames
+        assert permission2.codename in codenames
 
-    def test_permission_serializer_content_type_string(self):
+    def test_permission_serializer_content_type_string(self, test_permission):
         """Test that content_type is displayed as string"""
-        serializer = PermissionSerializer(instance=self.permission)
+        # GIVEN: A permission instance
+        permission = test_permission
+
+        # WHEN: Serializing the permission
+        serializer = PermissionSerializer(instance=permission)
         data = serializer.data
 
-        # StringRelatedField should return the string representation
-        self.assertIsInstance(data["content_type"], str)
+        # THEN: content_type is a string
+        assert isinstance(data["content_type"], str)
 
-    def test_permission_serializer_with_different_content_types(self):
+    def test_permission_serializer_with_different_content_types(self, user_content_type):
         """Test permission serializer with different content types"""
-        from django.contrib.auth.models import Group
+        # GIVEN: A permission with Group content type
+        from django.contrib.contenttypes.models import ContentType
 
         group_content_type = ContentType.objects.get_for_model(Group)
         group_permission = Permission.objects.create(
             codename="test_group_permission", name="Can test group permission", content_type=group_content_type
         )
 
+        # WHEN: Serializing the group permission
         serializer = PermissionSerializer(instance=group_permission)
         data = serializer.data
 
-        self.assertEqual(data["codename"], "test_group_permission")
-        self.assertIn("group", data["content_type"].lower())
+        # THEN: Permission data is correct and content_type mentions 'group'
+        assert data["codename"] == "test_group_permission"
+        assert "group" in data["content_type"].lower()
 
     def test_permission_serializer_empty_queryset(self):
         """Test permission serializer with empty queryset"""
+        # GIVEN: An empty permission queryset
         permissions = Permission.objects.none()
+
+        # WHEN: Serializing the empty queryset
         serializer = PermissionSerializer(permissions, many=True)
         data = serializer.data
 
-        self.assertEqual(len(data), 0)
+        # THEN: Empty list is returned
+        assert len(data) == 0
 
-    def test_permission_serializer_fields_count(self):
+    def test_permission_serializer_fields_count(self, test_permission):
         """Test that permission serializer has correct number of fields"""
-        serializer = PermissionSerializer(instance=self.permission)
+        # GIVEN: A permission instance
+        permission = test_permission
 
+        # WHEN: Creating a serializer with the permission
+        serializer = PermissionSerializer(instance=permission)
+
+        # THEN: Only expected fields are present
         expected_fields = ["id", "name", "codename", "content_type"]
-        self.assertEqual(set(serializer.fields.keys()), set(expected_fields))
+        assert set(serializer.fields.keys()) == set(expected_fields)
 
     def test_permission_serializer_with_null_instance(self):
         """Test permission serializer with None instance"""
+        # GIVEN: A None instance
+        # WHEN: Creating a serializer with None
         serializer = PermissionSerializer(instance=None)
-        # When instance is None, accessing .data returns an empty ReturnDict
         data = serializer.data
 
-        # Verify the data structure is empty or has None/empty values
-        self.assertIsInstance(data, dict)
+        # THEN: Data is an empty dict-like structure
+        assert isinstance(data, dict)

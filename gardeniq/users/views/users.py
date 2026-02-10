@@ -5,8 +5,8 @@ from rest_framework.permissions import BasePermission
 from rest_framework.permissions import IsAdminUser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
 
+from gardeniq.base.views.base import BaseAPIModelViewSet
 from gardeniq.users.serializers import UserDetailReadOnlySerializer
 from gardeniq.users.serializers import UserReadOnlySerializer
 from gardeniq.users.serializers import UserSerializer
@@ -27,7 +27,7 @@ class IsOwnerOrAdmin(BasePermission):
         return obj == request.user
 
 
-class UserAPIModelView(ModelViewSet):
+class UserAPIModelView(BaseAPIModelViewSet):
     """
     ViewSet CRUD for users.
 
@@ -40,6 +40,9 @@ class UserAPIModelView(ModelViewSet):
     me: GET /api/users/me/ - Get authenticated user info
     """
 
+    serializer_class = UserSerializer
+    list_serializer_class = UserReadOnlySerializer
+    detail_serializer_class = UserDetailReadOnlySerializer
     queryset = User.objects.all().prefetch_related("groups", "user_permissions")
     http_method_names = ["get", "post", "put", "delete"]
 
@@ -66,16 +69,6 @@ class UserAPIModelView(ModelViewSet):
         else:
             permission_classes = [IsAuthenticated, IsAdminUser]
         return [permission() for permission in permission_classes]
-
-    def get_serializer_class(self):
-        """
-        Different serializers based on action.
-        """
-        if self.action == "retrieve":
-            return UserDetailReadOnlySerializer
-        elif self.action == "list":
-            return UserReadOnlySerializer
-        return UserSerializer
 
     @action(detail=False, methods=["get"])
     def me(self, request):

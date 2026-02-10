@@ -111,13 +111,8 @@ def main(filter_type, filter_value):
     usb_card, usb_port = find_usb_device(filter_type, filter_value)
 
     if usb_card:
-        print(
-            "✅"
-            + style.SUCCESS(
-                f" usb card successfully detected !\n\tHost port is `{usb_port}`\n\t\
-Mounted on docker to `{DOCKER_USB_PORT}`\n"
-            )
-        )
+        print("✅" + style.SUCCESS(f" usb card successfully detected !\n\tHost port is `{usb_port}`\n\t\
+Mounted on docker to `{DOCKER_USB_PORT}`\n"))
     else:
         print("❌" + style.ERROR(" usb card not detected :("))
         sys.exit(1)

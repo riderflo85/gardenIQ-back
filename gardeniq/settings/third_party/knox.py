@@ -1,4 +1,5 @@
 """Knox settings"""
+
 from datetime import timedelta
 
 # https://james1345.github.io/django-rest-knox/settings/

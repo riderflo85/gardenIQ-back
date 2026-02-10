@@ -1,7 +1,8 @@
 from typing import Dict
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group, Permission
+from django.contrib.auth.models import Group
+from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Model
 from django.test import RequestFactory
@@ -92,12 +93,14 @@ class ViewSetTestMixin:
 
         Returns a callable that accepts a user and returns a mock request with that user.
         """
+
         def _create_request(user):
             """Create a mock request with the given user."""
             factory = RequestFactory()
-            request = factory.get('/')
+            request = factory.get("/")
             request.user = user
             return request
+
         return _create_request
 
     @pytest.fixture
@@ -109,31 +112,27 @@ class ViewSetTestMixin:
     def test_permission(self, user_content_type):
         """Create a test permission."""
         return Permission.objects.create(
-            codename='test_permission',
-            name='Test Permission',
-            content_type=user_content_type
+            codename="test_permission", name="Test Permission", content_type=user_content_type
         )
 
     @pytest.fixture
     def test_permission_2(self, user_content_type):
         """Create a second test permission."""
         return Permission.objects.create(
-            codename='test_permission_2',
-            name='Test Permission 2',
-            content_type=user_content_type
+            codename="test_permission_2", name="Test Permission 2", content_type=user_content_type
         )
 
     @pytest.fixture
     def test_group(self, test_permission):
         """Create a test group with permissions."""
-        group = Group.objects.create(name='Test Group')
+        group = Group.objects.create(name="Test Group")
         group.permissions.add(test_permission)
         return group
 
     @pytest.fixture
     def test_group_2(self, test_permission_2):
         """Create a second test group with permissions."""
-        group = Group.objects.create(name='Test Group 2')
+        group = Group.objects.create(name="Test Group 2")
         group.permissions.add(test_permission_2)
         return group
 
@@ -141,24 +140,24 @@ class ViewSetTestMixin:
     def regular_user(self):
         """Create a regular non-staff user."""
         return User.objects.create_user(
-            username='regularuser',
-            email='regular@example.com',
-            password='RegularPass123!',
-            first_name='Regular',
-            last_name='User'
+            username="regularuser",
+            email="regular@example.com",
+            password="RegularPass123!",
+            first_name="Regular",
+            last_name="User",
         )
 
     @pytest.fixture
     def admin_user(self):
         """Create an admin user with staff privileges."""
         return User.objects.create_user(
-            username='adminuser',
-            email='admin@example.com',
-            password='AdminPass123!',
-            first_name='Admin',
-            last_name='User',
+            username="adminuser",
+            email="admin@example.com",
+            password="AdminPass123!",
+            first_name="Admin",
+            last_name="User",
             is_staff=True,
-            is_superuser=True
+            is_superuser=True,
         )
 
     @pytest.fixture
@@ -195,10 +194,10 @@ class ViewSetTestMixin:
     def user_payload(self):
         """Return a valid user creation payload."""
         return {
-            'username': 'newuser',
-            'password': 'NewUserPass123!',
-            'password_confirm': 'NewUserPass123!',
-            'email': 'newuser@example.com',
-            'first_name': 'New',
-            'last_name': 'User'
+            "username": "newuser",
+            "password": "NewUserPass123!",
+            "password_confirm": "NewUserPass123!",
+            "email": "newuser@example.com",
+            "first_name": "New",
+            "last_name": "User",
         }

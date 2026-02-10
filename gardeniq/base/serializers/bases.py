@@ -55,6 +55,4 @@ class ReadOnlySerializer(serializers.Serializer):
         """
         Override save to prevent saving.
         """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} is read-only and cannot save objects."
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} is read-only and cannot save objects.")

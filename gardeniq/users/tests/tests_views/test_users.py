@@ -4,10 +4,13 @@ Tests for UserAPIModelView.
 Tests cover all CRUD operations with proper permission checks.
 Uses the GIVEN-WHEN-THEN pattern for clarity.
 """
-import pytest
+
 from django.contrib.auth import get_user_model
+
 from rest_framework import status
 from rest_framework.reverse import reverse
+
+import pytest
 
 from gardeniq.base.utils.tests import ViewSetTestMixin
 
@@ -22,23 +25,23 @@ class TestUserAPIModelViewList(ViewSetTestMixin):
         """Test that admin can list all users."""
         # GIVEN
         # Two users exist (regular_user and admin_user from fixtures)
-        url = reverse('users-list')
+        url = reverse("users-list")
 
         # WHEN
         response = admin_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
-        assert 'results' in response.data or isinstance(response.data, list)
+        assert "results" in response.data or isinstance(response.data, list)
         # Verify at least 2 users in the response
-        data = response.data.get('results', response.data) if isinstance(response.data, dict) else response.data
+        data = response.data.get("results", response.data) if isinstance(response.data, dict) else response.data
         assert len(data) >= 2
 
     def test_list_users_as_regular_user_forbidden(self, authenticated_client):
         """Test that regular user cannot list users."""
         # GIVEN
         # Regular authenticated user
-        url = reverse('users-list')
+        url = reverse("users-list")
 
         # WHEN
         response = authenticated_client.get(url)
@@ -50,7 +53,7 @@ class TestUserAPIModelViewList(ViewSetTestMixin):
         """Test that anonymous user cannot list users."""
         # GIVEN
         # Unauthenticated client
-        url = reverse('users-list')
+        url = reverse("users-list")
 
         # WHEN
         response = unauthenticated_client.get(url)
@@ -67,26 +70,24 @@ class TestUserAPIModelViewRetrieve(ViewSetTestMixin):
         """Test that user can retrieve their own details."""
         # GIVEN
         # Authenticated regular user
-        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        url = reverse("users-detail", kwargs={"pk": regular_user.pk})
 
         # WHEN
         response = authenticated_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
-        assert response.data['id'] == regular_user.pk
-        assert response.data['username'] == regular_user.username
-        assert response.data['email'] == regular_user.email
-        assert 'groups' in response.data
-        assert 'user_permissions' in response.data
+        assert response.data["id"] == regular_user.pk
+        assert response.data["username"] == regular_user.username
+        assert response.data["email"] == regular_user.email
+        assert "groups" in response.data
+        assert "user_permissions" in response.data
 
-    def test_retrieve_other_user_as_regular_user_forbidden(
-        self, authenticated_client, regular_user, admin_user
-    ):
+    def test_retrieve_other_user_as_regular_user_forbidden(self, authenticated_client, regular_user, admin_user):
         """Test that regular user cannot retrieve another user's details."""
         # GIVEN
         # Authenticated regular user trying to access admin user
-        url = reverse('users-detail', kwargs={'pk': admin_user.pk})
+        url = reverse("users-detail", kwargs={"pk": admin_user.pk})
 
         # WHEN
         response = authenticated_client.get(url)
@@ -98,21 +99,21 @@ class TestUserAPIModelViewRetrieve(ViewSetTestMixin):
         """Test that admin can retrieve any user's details."""
         # GIVEN
         # Authenticated admin user
-        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        url = reverse("users-detail", kwargs={"pk": regular_user.pk})
 
         # WHEN
         response = admin_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
-        assert response.data['id'] == regular_user.pk
-        assert response.data['username'] == regular_user.username
+        assert response.data["id"] == regular_user.pk
+        assert response.data["username"] == regular_user.username
 
     def test_retrieve_user_as_anonymous_forbidden(self, unauthenticated_client, regular_user):
         """Test that anonymous user cannot retrieve user details."""
         # GIVEN
         # Unauthenticated client
-        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        url = reverse("users-detail", kwargs={"pk": regular_user.pk})
 
         # WHEN
         response = unauthenticated_client.get(url)
@@ -124,7 +125,7 @@ class TestUserAPIModelViewRetrieve(ViewSetTestMixin):
         """Test retrieving a non-existent user returns 404."""
         # GIVEN
         # Admin client and non-existent user ID
-        url = reverse('users-detail', kwargs={'pk': 99999})
+        url = reverse("users-detail", kwargs={"pk": 99999})
 
         # WHEN
         response = admin_client.get(url)
@@ -141,23 +142,23 @@ class TestUserAPIModelViewCreate(ViewSetTestMixin):
         """Test that admin can create a new user."""
         # GIVEN
         # Admin client and valid user data
-        url = reverse('users-list')
+        url = reverse("users-list")
         initial_count = User.objects.count()
 
         # WHEN
-        response = admin_client.post(url, data=user_payload, format='json')
+        response = admin_client.post(url, data=user_payload, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_201_CREATED
-        assert response.data['username'] == user_payload['username']
-        assert response.data['email'] == user_payload['email']
-        assert 'password' not in response.data
+        assert response.data["username"] == user_payload["username"]
+        assert response.data["email"] == user_payload["email"]
+        assert "password" not in response.data
         assert User.objects.count() == initial_count + 1
 
         # Verify user in database
-        user = User.objects.get(username=user_payload['username'])
-        assert user.check_password(user_payload['password'])
-        assert user.email == user_payload['email']
+        user = User.objects.get(username=user_payload["username"])
+        assert user.check_password(user_payload["password"])
+        assert user.email == user_payload["email"]
 
     def test_create_user_with_groups_and_permissions_as_admin(
         self, admin_client, user_payload, test_group, test_permission
@@ -165,16 +166,16 @@ class TestUserAPIModelViewCreate(ViewSetTestMixin):
         """Test that admin can create user with groups and permissions."""
         # GIVEN
         # Admin client and user data with groups and permissions
-        url = reverse('users-list')
-        user_payload['group_ids'] = [test_group.id]
-        user_payload['permission_ids'] = [test_permission.id]
+        url = reverse("users-list")
+        user_payload["group_ids"] = [test_group.id]
+        user_payload["permission_ids"] = [test_permission.id]
 
         # WHEN
-        response = admin_client.post(url, data=user_payload, format='json')
+        response = admin_client.post(url, data=user_payload, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_201_CREATED
-        user = User.objects.get(username=user_payload['username'])
+        user = User.objects.get(username=user_payload["username"])
         assert user.groups.filter(id=test_group.id).exists()
         assert user.user_permissions.filter(id=test_permission.id).exists()
 
@@ -182,10 +183,10 @@ class TestUserAPIModelViewCreate(ViewSetTestMixin):
         """Test that regular user cannot create users."""
         # GIVEN
         # Regular authenticated user
-        url = reverse('users-list')
+        url = reverse("users-list")
 
         # WHEN
-        response = authenticated_client.post(url, data=user_payload, format='json')
+        response = authenticated_client.post(url, data=user_payload, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_403_FORBIDDEN
@@ -194,10 +195,10 @@ class TestUserAPIModelViewCreate(ViewSetTestMixin):
         """Test that anonymous user cannot create users."""
         # GIVEN
         # Unauthenticated client
-        url = reverse('users-list')
+        url = reverse("users-list")
 
         # WHEN
-        response = unauthenticated_client.post(url, data=user_payload, format='json')
+        response = unauthenticated_client.post(url, data=user_payload, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -206,104 +207,100 @@ class TestUserAPIModelViewCreate(ViewSetTestMixin):
         """Test that creating user without password fails."""
         # GIVEN
         # User data without password
-        del user_payload['password']
-        url = reverse('users-list')
+        del user_payload["password"]
+        url = reverse("users-list")
 
         # WHEN
-        response = admin_client.post(url, data=user_payload, format='json')
+        response = admin_client.post(url, data=user_payload, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'password' in response.data
+        assert "password" in response.data
 
     def test_create_user_without_password_confirm_fails(self, admin_client, user_payload):
         """Test that creating user without password confirmation fails."""
         # GIVEN
         # User data without password_confirm
-        del user_payload['password_confirm']
-        url = reverse('users-list')
+        del user_payload["password_confirm"]
+        url = reverse("users-list")
 
         # WHEN
-        response = admin_client.post(url, data=user_payload, format='json')
+        response = admin_client.post(url, data=user_payload, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'password_confirm' in response.data
+        assert "password_confirm" in response.data
 
     def test_create_user_with_mismatched_passwords_fails(self, admin_client, user_payload):
         """Test that creating user with mismatched passwords fails."""
         # GIVEN
         # User data with mismatched passwords
-        user_payload['password_confirm'] = 'DifferentPass123!'
-        url = reverse('users-list')
+        user_payload["password_confirm"] = "DifferentPass123!"
+        url = reverse("users-list")
 
         # WHEN
-        response = admin_client.post(url, data=user_payload, format='json')
+        response = admin_client.post(url, data=user_payload, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'password_confirm' in response.data
+        assert "password_confirm" in response.data
 
-    def test_create_user_with_duplicate_username_fails(
-        self, admin_client, user_payload, regular_user
-    ):
+    def test_create_user_with_duplicate_username_fails(self, admin_client, user_payload, regular_user):
         """Test that creating user with duplicate username fails."""
         # GIVEN
         # User data with existing username
-        user_payload['username'] = regular_user.username
-        url = reverse('users-list')
+        user_payload["username"] = regular_user.username
+        url = reverse("users-list")
 
         # WHEN
-        response = admin_client.post(url, data=user_payload, format='json')
+        response = admin_client.post(url, data=user_payload, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'username' in response.data
+        assert "username" in response.data
 
-    def test_create_user_with_duplicate_email_fails(
-        self, admin_client, user_payload, regular_user
-    ):
+    def test_create_user_with_duplicate_email_fails(self, admin_client, user_payload, regular_user):
         """Test that creating user with duplicate email fails."""
         # GIVEN
         # User data with existing email
-        user_payload['email'] = regular_user.email
-        url = reverse('users-list')
+        user_payload["email"] = regular_user.email
+        url = reverse("users-list")
 
         # WHEN
-        response = admin_client.post(url, data=user_payload, format='json')
+        response = admin_client.post(url, data=user_payload, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'email' in response.data
+        assert "email" in response.data
 
     def test_create_user_with_short_password_fails(self, admin_client, user_payload):
         """Test that creating user with short password fails."""
         # GIVEN
         # User data with short password
-        user_payload['password'] = 'short'
-        user_payload['password_confirm'] = 'short'
-        url = reverse('users-list')
+        user_payload["password"] = "short"
+        user_payload["password_confirm"] = "short"
+        url = reverse("users-list")
 
         # WHEN
-        response = admin_client.post(url, data=user_payload, format='json')
+        response = admin_client.post(url, data=user_payload, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'password' in response.data
+        assert "password" in response.data
 
     def test_create_user_with_invalid_email_fails(self, admin_client, user_payload):
         """Test that creating user with invalid email fails."""
         # GIVEN
         # User data with invalid email
-        user_payload['email'] = 'invalid-email'
-        url = reverse('users-list')
+        user_payload["email"] = "invalid-email"
+        url = reverse("users-list")
 
         # WHEN
-        response = admin_client.post(url, data=user_payload, format='json')
+        response = admin_client.post(url, data=user_payload, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'email' in response.data
+        assert "email" in response.data
 
 
 @pytest.mark.django_db
@@ -314,97 +311,83 @@ class TestUserAPIModelViewUpdate(ViewSetTestMixin):
         """Test that user can update their own profile."""
         # GIVEN
         # Authenticated regular user
-        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        url = reverse("users-detail", kwargs={"pk": regular_user.pk})
         update_data = {
-            'username': regular_user.username,
-            'first_name': 'Updated',
-            'last_name': 'Name',
-            'email': 'updated@example.com'
+            "username": regular_user.username,
+            "first_name": "Updated",
+            "last_name": "Name",
+            "email": "updated@example.com",
         }
 
         # WHEN
-        response = authenticated_client.put(url, data=update_data, format='json')
+        response = authenticated_client.put(url, data=update_data, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
         regular_user.refresh_from_db()
-        assert regular_user.first_name == 'Updated'
-        assert regular_user.last_name == 'Name'
-        assert regular_user.email == 'updated@example.com'
+        assert regular_user.first_name == "Updated"
+        assert regular_user.last_name == "Name"
+        assert regular_user.email == "updated@example.com"
 
     def test_update_own_password_as_regular_user(self, authenticated_client, regular_user):
         """Test that user can update their own password."""
         # GIVEN
         # Authenticated regular user
-        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        url = reverse("users-detail", kwargs={"pk": regular_user.pk})
         update_data = {
-            'username': regular_user.username,
-            'password': 'NewPassword123!',
-            'password_confirm': 'NewPassword123!'
+            "username": regular_user.username,
+            "password": "NewPassword123!",
+            "password_confirm": "NewPassword123!",
         }
 
         # WHEN
-        response = authenticated_client.put(url, data=update_data, format='json')
+        response = authenticated_client.put(url, data=update_data, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
         regular_user.refresh_from_db()
-        assert regular_user.check_password('NewPassword123!')
+        assert regular_user.check_password("NewPassword123!")
 
-    def test_update_other_user_as_regular_user_forbidden(
-        self, authenticated_client, regular_user, admin_user
-    ):
+    def test_update_other_user_as_regular_user_forbidden(self, authenticated_client, regular_user, admin_user):
         """Test that regular user cannot update another user."""
         # GIVEN
         # Regular user trying to update admin user
-        url = reverse('users-detail', kwargs={'pk': admin_user.pk})
-        update_data = {
-            'username': admin_user.username,
-            'first_name': 'Hacked'
-        }
+        url = reverse("users-detail", kwargs={"pk": admin_user.pk})
+        update_data = {"username": admin_user.username, "first_name": "Hacked"}
 
         # WHEN
-        response = authenticated_client.put(url, data=update_data, format='json')
+        response = authenticated_client.put(url, data=update_data, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_403_FORBIDDEN
         admin_user.refresh_from_db()
-        assert admin_user.first_name != 'Hacked'
+        assert admin_user.first_name != "Hacked"
 
     def test_update_any_user_as_admin(self, admin_client, regular_user):
         """Test that admin can update any user."""
         # GIVEN
         # Admin client updating regular user
-        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
-        update_data = {
-            'username': regular_user.username,
-            'first_name': 'AdminUpdated',
-            'is_active': False
-        }
+        url = reverse("users-detail", kwargs={"pk": regular_user.pk})
+        update_data = {"username": regular_user.username, "first_name": "AdminUpdated", "is_active": False}
 
         # WHEN
-        response = admin_client.put(url, data=update_data, format='json')
+        response = admin_client.put(url, data=update_data, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
         regular_user.refresh_from_db()
-        assert regular_user.first_name == 'AdminUpdated'
+        assert regular_user.first_name == "AdminUpdated"
         assert regular_user.is_active is False
 
-    def test_update_user_with_groups_as_admin(
-        self, admin_client, regular_user, test_group, test_group_2
-    ):
+    def test_update_user_with_groups_as_admin(self, admin_client, regular_user, test_group, test_group_2):
         """Test that admin can update user's groups."""
         # GIVEN
         # Admin updating user's groups
-        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
-        update_data = {
-            'username': regular_user.username,
-            'group_ids': [test_group.id, test_group_2.id]
-        }
+        url = reverse("users-detail", kwargs={"pk": regular_user.pk})
+        update_data = {"username": regular_user.username, "group_ids": [test_group.id, test_group_2.id]}
 
         # WHEN
-        response = admin_client.put(url, data=update_data, format='json')
+        response = admin_client.put(url, data=update_data, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
@@ -413,42 +396,38 @@ class TestUserAPIModelViewUpdate(ViewSetTestMixin):
         assert regular_user.groups.filter(id=test_group.id).exists()
         assert regular_user.groups.filter(id=test_group_2.id).exists()
 
-    def test_update_user_with_mismatched_passwords_fails(
-        self, authenticated_client, regular_user
-    ):
+    def test_update_user_with_mismatched_passwords_fails(self, authenticated_client, regular_user):
         """Test that updating user with mismatched passwords fails."""
         # GIVEN
         # User data with mismatched passwords
-        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        url = reverse("users-detail", kwargs={"pk": regular_user.pk})
         update_data = {
-            'username': regular_user.username,
-            'password': 'NewPassword123!',
-            'password_confirm': 'DifferentPass123!'
+            "username": regular_user.username,
+            "password": "NewPassword123!",
+            "password_confirm": "DifferentPass123!",
         }
 
         # WHEN
-        response = authenticated_client.put(url, data=update_data, format='json')
+        response = authenticated_client.put(url, data=update_data, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_update_user_to_duplicate_username_fails(
-        self, admin_client, regular_user, admin_user
-    ):
+    def test_update_user_to_duplicate_username_fails(self, admin_client, regular_user, admin_user):
         """Test that updating to duplicate username fails."""
         # GIVEN
         # Trying to use existing username
-        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        url = reverse("users-detail", kwargs={"pk": regular_user.pk})
         update_data = {
-            'username': admin_user.username,  # Already exists
+            "username": admin_user.username,  # Already exists
         }
 
         # WHEN
-        response = admin_client.put(url, data=update_data, format='json')
+        response = admin_client.put(url, data=update_data, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'username' in response.data
+        assert "username" in response.data
 
 
 @pytest.mark.django_db
@@ -459,7 +438,7 @@ class TestUserAPIModelViewDelete(ViewSetTestMixin):
         """Test that admin can delete a user."""
         # GIVEN
         # Admin client and existing user
-        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        url = reverse("users-detail", kwargs={"pk": regular_user.pk})
         user_id = regular_user.pk
 
         # WHEN
@@ -469,13 +448,11 @@ class TestUserAPIModelViewDelete(ViewSetTestMixin):
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not User.objects.filter(pk=user_id).exists()
 
-    def test_delete_user_as_regular_user_forbidden(
-        self, authenticated_client, regular_user
-    ):
+    def test_delete_user_as_regular_user_forbidden(self, authenticated_client, regular_user):
         """Test that regular user cannot delete themselves."""
         # GIVEN
         # Regular user trying to delete themselves
-        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        url = reverse("users-detail", kwargs={"pk": regular_user.pk})
 
         # WHEN
         response = authenticated_client.delete(url)
@@ -484,13 +461,11 @@ class TestUserAPIModelViewDelete(ViewSetTestMixin):
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert User.objects.filter(pk=regular_user.pk).exists()
 
-    def test_delete_user_as_anonymous_forbidden(
-        self, unauthenticated_client, regular_user
-    ):
+    def test_delete_user_as_anonymous_forbidden(self, unauthenticated_client, regular_user):
         """Test that anonymous user cannot delete users."""
         # GIVEN
         # Unauthenticated client
-        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
+        url = reverse("users-detail", kwargs={"pk": regular_user.pk})
 
         # WHEN
         response = unauthenticated_client.delete(url)
@@ -503,7 +478,7 @@ class TestUserAPIModelViewDelete(ViewSetTestMixin):
         """Test deleting non-existent user returns 404."""
         # GIVEN
         # Admin client and non-existent user ID
-        url = reverse('users-detail', kwargs={'pk': 99999})
+        url = reverse("users-detail", kwargs={"pk": 99999})
 
         # WHEN
         response = admin_client.delete(url)
@@ -516,42 +491,32 @@ class TestUserAPIModelViewDelete(ViewSetTestMixin):
 class TestUserAPIModelViewPermissions(ViewSetTestMixin):
     """Tests for permission edge cases and special scenarios."""
 
-    def test_regular_user_cannot_assign_groups(
-        self, authenticated_client, regular_user, test_group
-    ):
+    def test_regular_user_cannot_assign_groups(self, authenticated_client, regular_user, test_group):
         """Test that regular user cannot assign groups to themselves."""
         # GIVEN
         # Regular user trying to add groups
-        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
-        update_data = {
-            'username': regular_user.username,
-            'group_ids': [test_group.id]
-        }
+        url = reverse("users-detail", kwargs={"pk": regular_user.pk})
+        update_data = {"username": regular_user.username, "group_ids": [test_group.id]}
 
         # WHEN
-        response = authenticated_client.put(url, data=update_data, format='json')
+        response = authenticated_client.put(url, data=update_data, format="json")
 
         # THEN
         # The validation should fail at serializer level
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'group_ids' in response.data
+        assert "group_ids" in response.data
 
-    def test_regular_user_cannot_assign_permissions(
-        self, authenticated_client, regular_user, test_permission
-    ):
+    def test_regular_user_cannot_assign_permissions(self, authenticated_client, regular_user, test_permission):
         """Test that regular user cannot assign permissions to themselves."""
         # GIVEN
         # Regular user trying to add permissions
-        url = reverse('users-detail', kwargs={'pk': regular_user.pk})
-        update_data = {
-            'username': regular_user.username,
-            'permission_ids': [test_permission.id]
-        }
+        url = reverse("users-detail", kwargs={"pk": regular_user.pk})
+        update_data = {"username": regular_user.username, "permission_ids": [test_permission.id]}
 
         # WHEN
-        response = authenticated_client.put(url, data=update_data, format='json')
+        response = authenticated_client.put(url, data=update_data, format="json")
 
         # THEN
         # The validation should fail at serializer level
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'permission_ids' in response.data
+        assert "permission_ids" in response.data

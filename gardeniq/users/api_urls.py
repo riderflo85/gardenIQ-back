@@ -1,9 +1,11 @@
-from django.urls import path, include
+from django.urls import include
+from django.urls import path
+
 from knox import views as knox_views
 
 from gardeniq.base.routers import ToggleObjectRouter
-from gardeniq.users.views import UserAPIModelView, LoginView
-
+from gardeniq.users.views import LoginView
+from gardeniq.users.views import UserAPIModelView
 
 router = ToggleObjectRouter()
 router.register(

@@ -1,14 +1,17 @@
 from typing import Dict
 
-from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group, Permission
+from django.contrib.auth.models import Group
+from django.contrib.auth.models import Permission
 from django.contrib.auth.password_validation import validate_password as password_validation
 from django.core.exceptions import ValidationError as DjangoValidationError
 
+from rest_framework import serializers
+
 from gardeniq.base.serializers import ReadOnlySerializer
-from .permissions import PermissionSerializer
+
 from .groups import GroupSerializer
+from .permissions import PermissionSerializer
 
 User = get_user_model()
 
@@ -37,12 +40,12 @@ class UserSerializer(serializers.Serializer):
     )
 
     def validate_group_ids(self, value):
-        if not self.context['request'].user.is_staff:
+        if not self.context["request"].user.is_staff:
             raise serializers.ValidationError("Only administrators can assign groups.")
         return value
 
     def validate_permission_ids(self, value):
-        if not self.context['request'].user.is_staff:
+        if not self.context["request"].user.is_staff:
             raise serializers.ValidationError("Only administrators can assign permissions.")
         return value
 
@@ -153,6 +156,7 @@ class UserSerializer(serializers.Serializer):
 
         return instance
 
+
 class UserReadOnlySerializer(ReadOnlySerializer, UserSerializer):
     """
     Read-only serializer for User instances.
@@ -164,10 +168,11 @@ class UserReadOnlySerializer(ReadOnlySerializer, UserSerializer):
     last_login = serializers.DateTimeField(read_only=True)
     date_joined = serializers.DateTimeField(read_only=True)
 
+
 class UserDetailReadOnlySerializer(UserReadOnlySerializer):
     """
     Detailed read-only serializer for User instances, including groups and permissions.
     """
+
     groups = GroupSerializer(many=True, read_only=True)
     user_permissions = PermissionSerializer(many=True, read_only=True)
-

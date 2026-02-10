@@ -1,11 +1,15 @@
 from django.contrib.auth import get_user_model
 
-from rest_framework.permissions import IsAuthenticated, BasePermission, IsAdminUser
-from rest_framework.viewsets import ModelViewSet
 from rest_framework.decorators import action
+from rest_framework.permissions import BasePermission
+from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
 
-from gardeniq.users.serializers import UserSerializer, UserReadOnlySerializer, UserDetailReadOnlySerializer
+from gardeniq.users.serializers import UserDetailReadOnlySerializer
+from gardeniq.users.serializers import UserReadOnlySerializer
+from gardeniq.users.serializers import UserSerializer
 
 User = get_user_model()
 
@@ -14,6 +18,7 @@ class IsOwnerOrAdmin(BasePermission):
     """
     Custom permission: owner or admin.
     """
+
     def has_object_permission(self, request, view, obj):
         # Admins have all rights
         if request.user.is_staff:
@@ -34,15 +39,16 @@ class UserAPIModelView(ModelViewSet):
     destroy: DELETE /api/users/{id}/ - Delete a user (admin only)
     me: GET /api/users/me/ - Get authenticated user info
     """
+
     queryset = User.objects.all().prefetch_related("groups", "user_permissions")
-    http_method_names = ['get', 'post', 'put', 'delete']
+    http_method_names = ["get", "post", "put", "delete"]
 
     def get_permissions(self):
         """
         Different permissions based on action.
         """
         # Check if this is a request to /me/ endpoint (for any HTTP method)
-        if self.action == "me" or (hasattr(self, 'request') and '/me/' in self.request.path):
+        if self.action == "me" or (hasattr(self, "request") and "/me/" in self.request.path):
             # Any authenticated user can access their own profile
             permission_classes = [IsAuthenticated]
         elif self.action == "retrieve":

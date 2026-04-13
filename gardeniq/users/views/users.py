@@ -54,12 +54,13 @@ class UserAPIModelView(BaseAPIModelViewSet):
         if self.action == "me" or (hasattr(self, "request") and "/me/" in self.request.path):
             # Any authenticated user can access their own profile
             permission_classes = [IsAuthenticated]
-        elif self.action == "retrieve":
+        elif self.action in ("retrieve", "update"):
             # Owner or admin
             permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
-        elif self.action == "update":
-            # Owner can modify their profile, admin can all
-            permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+
+        # TODO: À revoir plus tard pour séparer la création du premier compte (dans un autre endpoint API)
+        # Mais laisser la possibilité de créer un nouveau compte user à partir d'ici
+
         # elif self.action == "create":
         #     if self.queryset.count() == 0:
         #         # Allow creation if no users exist (initial setup)

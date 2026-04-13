@@ -22,9 +22,12 @@ class UserSerializer(serializers.Serializer):
     """
 
     id = serializers.IntegerField(read_only=True)
-    username = serializers.CharField(max_length=150, required=True, allow_blank=False)
-    password = serializers.CharField(write_only=True, min_length=8, required=False, allow_blank=False)
-    password_confirm = serializers.CharField(write_only=True, min_length=8, required=False, allow_blank=False)
+    username = serializers.CharField(max_length=150)
+
+    # Password is required on creation but optional on update
+    password = serializers.CharField(write_only=True, min_length=8, required=False)
+    password_confirm = serializers.CharField(write_only=True, min_length=8, required=False)
+
     first_name = serializers.CharField(max_length=150, allow_blank=True, required=False)
     last_name = serializers.CharField(max_length=150, allow_blank=True, required=False)
     email = serializers.EmailField(allow_blank=True, required=False)
@@ -39,14 +42,16 @@ class UserSerializer(serializers.Serializer):
         many=True, queryset=Permission.objects.all(), source="user_permissions", write_only=True, required=False
     )
 
-    def validate_group_ids(self, value):
+    def _check_user_is_staff(self, error_msg: str):
         if not self.context["request"].user.is_staff:
-            raise serializers.ValidationError("Only administrators can assign groups.")
+            raise serializers.ValidationError(error_msg)
+
+    def validate_group_ids(self, value):
+        self._check_user_is_staff("Only administrators can assign groups.")
         return value
 
     def validate_permission_ids(self, value):
-        if not self.context["request"].user.is_staff:
-            raise serializers.ValidationError("Only administrators can assign permissions.")
+        self._check_user_is_staff("Only administrators can assign permissions.")
         return value
 
     def validate_username(self, value: str) -> str:
@@ -90,22 +95,19 @@ class UserSerializer(serializers.Serializer):
         # Only require password and username on creation, not update
         is_creation = not self.instance
 
-        if is_creation:
-            if "password" not in attrs:
-                raise serializers.ValidationError({"password": "The password is required at creation."})
-            if "username" not in attrs:
-                raise serializers.ValidationError({"username": "The username is required at creation."})
-            if "password_confirm" not in attrs:
-                raise serializers.ValidationError({"password_confirm": "The password confirmation is required."})
-            if attrs["password"] != attrs["password_confirm"]:
-                raise serializers.ValidationError({"password_confirm": "The passwords do not match."})
-
-        # Check password confirmation if password is provided
+        # If password is provided, password_confirm must also be provided and match
         if "password" in attrs:
             if "password_confirm" not in attrs:
                 raise serializers.ValidationError({"password_confirm": "The password confirmation is required."})
             if attrs["password"] != attrs["password_confirm"]:
                 raise serializers.ValidationError({"password_confirm": "The passwords do not match."})
+
+        # Password is required at creation
+        if is_creation and "password" not in attrs:
+            raise serializers.ValidationError({"password": "The password is required at creation."})
+
+        # Remove password_confirm as it should not be saved
+        attrs.pop("password_confirm", None)
 
         return attrs
 
@@ -115,7 +117,6 @@ class UserSerializer(serializers.Serializer):
         """
         groups = validated_data.pop("groups", [])
         user_permissions = validated_data.pop("user_permissions", [])
-        validated_data.pop("password_confirm", None)
         password = validated_data.pop("password", None)
 
         user = User.objects.create(**validated_data)
@@ -134,13 +135,10 @@ class UserSerializer(serializers.Serializer):
         Update user, handling password separately.
         """
         password = validated_data.pop("password", None)
-        password_confirm = validated_data.pop("password_confirm", None)
         groups = validated_data.pop("groups", None)
         user_permissions = validated_data.pop("user_permissions", None)
 
         if password:
-            if password != password_confirm:
-                raise serializers.ValidationError({"password_confirm": "The passwords do not match."})
             instance.set_password(password)
 
         for key, value in validated_data.items():

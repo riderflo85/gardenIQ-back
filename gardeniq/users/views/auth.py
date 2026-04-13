@@ -4,6 +4,7 @@ from rest_framework.authtoken.serializers import AuthTokenSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework.throttling import AnonRateThrottle
 
+from drf_spectacular.utils import extend_schema
 from knox.views import LoginView as KnoxLoginView
 
 
@@ -11,6 +12,9 @@ class LoginThrottle(AnonRateThrottle):
     rate = "5/min"
 
 
+@extend_schema(
+    request=AuthTokenSerializer,
+)
 class LoginView(KnoxLoginView):
     """
     Custom login view that returns user data along with the token.

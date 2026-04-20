@@ -10,8 +10,8 @@ from rest_framework import serializers
 
 from gardeniq.base.serializers import ReadOnlySerializer
 
-from .groups import GroupSerializer
-from .permissions import PermissionSerializer
+from .groups import GroupReadOnlySerializer
+from .permissions import PermissionReadOnlySerializer
 
 User = get_user_model()
 
@@ -172,5 +172,5 @@ class UserDetailReadOnlySerializer(UserReadOnlySerializer):
     Detailed read-only serializer for User instances, including groups and permissions.
     """
 
-    groups = GroupSerializer(many=True, read_only=True)
-    user_permissions = PermissionSerializer(many=True, read_only=True)
+    groups = GroupReadOnlySerializer(many=True, read_only=True)
+    user_permissions = PermissionReadOnlySerializer(many=True, read_only=True)

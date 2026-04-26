@@ -44,7 +44,6 @@ class UserAPIModelView(BaseAPIModelViewSet):
     list_serializer_class = UserReadOnlySerializer
     detail_serializer_class = UserDetailReadOnlySerializer
     queryset = User.objects.all().prefetch_related("groups", "user_permissions")
-    http_method_names = ["get", "post", "put", "delete"]
 
     def get_permissions(self):
         """

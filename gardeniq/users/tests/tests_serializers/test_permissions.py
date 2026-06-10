@@ -4,12 +4,12 @@ from django.contrib.auth.models import Permission
 import pytest
 
 from gardeniq.base.utils.tests import ViewSetTestMixin
-from gardeniq.users.serializers.permissions import PermissionSerializer
+from gardeniq.users.serializers.permissions import PermissionReadOnlySerializer
 
 
 @pytest.mark.django_db
-class TestPermissionSerializer(ViewSetTestMixin):
-    """Test cases for PermissionSerializer"""
+class TestPermissionReadOnlySerializer(ViewSetTestMixin):
+    """Test cases for PermissionReadOnlySerializer"""
 
     def test_permission_serializer_representation(self, test_permission):
         """Test permission serializer representation"""
@@ -17,7 +17,7 @@ class TestPermissionSerializer(ViewSetTestMixin):
         permission = test_permission
 
         # WHEN: Serializing the permission
-        serializer = PermissionSerializer(instance=permission)
+        serializer = PermissionReadOnlySerializer(instance=permission)
         data = serializer.data
 
         # THEN: All fields are correctly represented
@@ -32,7 +32,7 @@ class TestPermissionSerializer(ViewSetTestMixin):
         permission = test_permission
 
         # WHEN: Creating a serializer with the permission
-        serializer = PermissionSerializer(instance=permission)
+        serializer = PermissionReadOnlySerializer(instance=permission)
 
         # THEN: All fields are read-only
         assert serializer.fields["id"].read_only is True
@@ -46,14 +46,14 @@ class TestPermissionSerializer(ViewSetTestMixin):
         data = {"name": "New Permission", "codename": "new_permission", "content_type": user_content_type.id}
 
         # WHEN: Attempting to create a permission using the serializer
-        serializer = PermissionSerializer(data=data)
+        serializer = PermissionReadOnlySerializer(data=data)
 
         # THEN: NotImplementedError is raised
         with pytest.raises(NotImplementedError) as exc_info:
             if serializer.is_valid():
                 serializer.save()
 
-        assert "does not support creation" in str(exc_info.value)
+        assert "cannot save objects" in str(exc_info.value)
 
     def test_permission_serializer_cannot_update(self, test_permission):
         """Test that permission serializer cannot update objects"""
@@ -62,14 +62,14 @@ class TestPermissionSerializer(ViewSetTestMixin):
         data = {"name": "Updated Permission"}
 
         # WHEN: Attempting to update the permission using the serializer
-        serializer = PermissionSerializer(instance=permission, data=data, partial=True)
+        serializer = PermissionReadOnlySerializer(instance=permission, data=data, partial=True)
 
         # THEN: NotImplementedError is raised
         with pytest.raises(NotImplementedError) as exc_info:
             if serializer.is_valid():
                 serializer.save()
 
-        assert "does not support update" in str(exc_info.value)
+        assert "cannot save objects" in str(exc_info.value)
 
     def test_permission_serializer_many(self, test_permission, test_permission_2):
         """Test permission serializer with many=True"""
@@ -79,7 +79,7 @@ class TestPermissionSerializer(ViewSetTestMixin):
 
         # WHEN: Serializing multiple permissions with many=True
         permissions = Permission.objects.filter(id__in=[permission1.id, permission2.id])
-        serializer = PermissionSerializer(permissions, many=True)
+        serializer = PermissionReadOnlySerializer(permissions, many=True)
         data = serializer.data
 
         # THEN: All permissions are correctly serialized
@@ -94,7 +94,7 @@ class TestPermissionSerializer(ViewSetTestMixin):
         permission = test_permission
 
         # WHEN: Serializing the permission
-        serializer = PermissionSerializer(instance=permission)
+        serializer = PermissionReadOnlySerializer(instance=permission)
         data = serializer.data
 
         # THEN: content_type is a string
@@ -111,7 +111,7 @@ class TestPermissionSerializer(ViewSetTestMixin):
         )
 
         # WHEN: Serializing the group permission
-        serializer = PermissionSerializer(instance=group_permission)
+        serializer = PermissionReadOnlySerializer(instance=group_permission)
         data = serializer.data
 
         # THEN: Permission data is correct and content_type mentions 'group'
@@ -124,7 +124,7 @@ class TestPermissionSerializer(ViewSetTestMixin):
         permissions = Permission.objects.none()
 
         # WHEN: Serializing the empty queryset
-        serializer = PermissionSerializer(permissions, many=True)
+        serializer = PermissionReadOnlySerializer(permissions, many=True)
         data = serializer.data
 
         # THEN: Empty list is returned
@@ -136,7 +136,7 @@ class TestPermissionSerializer(ViewSetTestMixin):
         permission = test_permission
 
         # WHEN: Creating a serializer with the permission
-        serializer = PermissionSerializer(instance=permission)
+        serializer = PermissionReadOnlySerializer(instance=permission)
 
         # THEN: Only expected fields are present
         expected_fields = ["id", "name", "codename", "content_type"]
@@ -146,7 +146,7 @@ class TestPermissionSerializer(ViewSetTestMixin):
         """Test permission serializer with None instance"""
         # GIVEN: A None instance
         # WHEN: Creating a serializer with None
-        serializer = PermissionSerializer(instance=None)
+        serializer = PermissionReadOnlySerializer(instance=None)
         data = serializer.data
 
         # THEN: Data is an empty dict-like structure

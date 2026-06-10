@@ -6,12 +6,12 @@ from rest_framework.relations import ManyRelatedField
 import pytest
 
 from gardeniq.base.utils.tests import ViewSetTestMixin
-from gardeniq.users.serializers.groups import GroupSerializer
+from gardeniq.users.serializers import GroupReadOnlySerializer
 
 
 @pytest.mark.django_db
 class TestGroupSerializer(ViewSetTestMixin):
-    """Test cases for GroupSerializer"""
+    """Test cases for GroupReadOnlySerializer"""
 
     def test_group_serializer_representation(self, test_group, test_permission):
         """Test group serializer representation"""
@@ -20,7 +20,7 @@ class TestGroupSerializer(ViewSetTestMixin):
         permission = test_permission
 
         # WHEN: Serializing the group
-        serializer = GroupSerializer(instance=group)
+        serializer = GroupReadOnlySerializer(instance=group)
         data = serializer.data
 
         # THEN: All fields are correctly represented
@@ -39,7 +39,7 @@ class TestGroupSerializer(ViewSetTestMixin):
         group.permissions.add(permission2)
 
         # WHEN: Serializing the group
-        serializer = GroupSerializer(instance=group)
+        serializer = GroupReadOnlySerializer(instance=group)
         data = serializer.data
 
         # THEN: All permissions are present
@@ -54,7 +54,7 @@ class TestGroupSerializer(ViewSetTestMixin):
         empty_group = Group.objects.create(name="Empty Group")
 
         # WHEN: Serializing the group
-        serializer = GroupSerializer(instance=empty_group)
+        serializer = GroupReadOnlySerializer(instance=empty_group)
         data = serializer.data
 
         # THEN: Group has no permissions
@@ -67,7 +67,7 @@ class TestGroupSerializer(ViewSetTestMixin):
         group = test_group
 
         # WHEN: Creating a serializer
-        serializer = GroupSerializer(instance=group)
+        serializer = GroupReadOnlySerializer(instance=group)
 
         # THEN: permissions field is read-only
         assert serializer.fields["permissions"].read_only is True
@@ -78,7 +78,7 @@ class TestGroupSerializer(ViewSetTestMixin):
         group = test_group
 
         # WHEN: Creating a serializer and accessing data
-        serializer = GroupSerializer(instance=group)
+        serializer = GroupReadOnlySerializer(instance=group)
         data = serializer.data
 
         # THEN: permission_ids is write-only and not in serialized data
@@ -91,7 +91,7 @@ class TestGroupSerializer(ViewSetTestMixin):
         group = test_group
 
         # WHEN: Creating a serializer
-        serializer = GroupSerializer(instance=group)
+        serializer = GroupReadOnlySerializer(instance=group)
 
         # THEN: id field is read-only
         assert serializer.fields["id"].read_only is True
@@ -103,14 +103,14 @@ class TestGroupSerializer(ViewSetTestMixin):
         data = {"name": "New Group", "permission_ids": [permission.id]}
 
         # WHEN: Attempting to create a group using the serializer
-        serializer = GroupSerializer(data=data)
+        serializer = GroupReadOnlySerializer(data=data)
 
         # THEN: NotImplementedError is raised
         with pytest.raises(NotImplementedError) as exc_info:
             if serializer.is_valid():
                 serializer.save()
 
-        assert "does not support creation" in str(exc_info.value)
+        assert "cannot save objects" in str(exc_info.value)
 
     def test_group_serializer_cannot_update(self, test_group, test_permission_2):
         """Test that group serializer cannot update objects"""
@@ -120,14 +120,14 @@ class TestGroupSerializer(ViewSetTestMixin):
         data = {"name": "Updated Group", "permission_ids": [permission2.id]}
 
         # WHEN: Attempting to update the group using the serializer
-        serializer = GroupSerializer(instance=group, data=data, partial=True)
+        serializer = GroupReadOnlySerializer(instance=group, data=data, partial=True)
 
         # THEN: NotImplementedError is raised
         with pytest.raises(NotImplementedError) as exc_info:
             if serializer.is_valid():
                 serializer.save()
 
-        assert "does not support update" in str(exc_info.value)
+        assert "cannot save objects" in str(exc_info.value)
 
     def test_group_serializer_many(self, test_group, test_group_2):
         """Test group serializer with many=True"""
@@ -137,7 +137,7 @@ class TestGroupSerializer(ViewSetTestMixin):
 
         # WHEN: Serializing multiple groups with many=True
         groups = Group.objects.filter(id__in=[group1.id, group2.id])
-        serializer = GroupSerializer(groups, many=True)
+        serializer = GroupReadOnlySerializer(groups, many=True)
         data = serializer.data
 
         # THEN: All groups are correctly serialized
@@ -152,7 +152,7 @@ class TestGroupSerializer(ViewSetTestMixin):
         group = test_group
 
         # WHEN: Serializing the group
-        serializer = GroupSerializer(instance=group)
+        serializer = GroupReadOnlySerializer(instance=group)
         data = serializer.data
 
         # THEN: Permission details are included
@@ -163,15 +163,15 @@ class TestGroupSerializer(ViewSetTestMixin):
         assert "content_type" in permission_data
 
     def test_group_serializer_name_field(self, test_group):
-        """Test that name field is writable"""
+        """Test that name field is read-only"""
         # GIVEN: A group instance
         group = test_group
 
         # WHEN: Creating a serializer
-        serializer = GroupSerializer(instance=group)
+        serializer = GroupReadOnlySerializer(instance=group)
 
-        # THEN: name field is not read-only
-        assert serializer.fields["name"].read_only is False
+        # THEN: name field is read-only
+        assert serializer.fields["name"].read_only is True
 
     def test_group_serializer_permission_ids_queryset(self, test_group):
         """Test that permission_ids field has correct queryset"""
@@ -179,7 +179,7 @@ class TestGroupSerializer(ViewSetTestMixin):
         group = test_group
 
         # WHEN: Creating a serializer and checking permission_ids field
-        serializer = GroupSerializer(instance=group)
+        serializer = GroupReadOnlySerializer(instance=group)
         permission_ids_field = serializer.fields["permission_ids"]
         queryset = permission_ids_field.child_relation.queryset
 
@@ -192,7 +192,7 @@ class TestGroupSerializer(ViewSetTestMixin):
         group = test_group
 
         # WHEN: Creating a serializer and checking permission_ids field
-        serializer = GroupSerializer(instance=group)
+        serializer = GroupReadOnlySerializer(instance=group)
         permission_ids_field = serializer.fields["permission_ids"]
 
         # THEN: Field is a ManyRelatedField
@@ -204,7 +204,7 @@ class TestGroupSerializer(ViewSetTestMixin):
         group = test_group
 
         # WHEN: Creating a serializer and checking permission_ids field
-        serializer = GroupSerializer(instance=group)
+        serializer = GroupReadOnlySerializer(instance=group)
         permission_ids_field = serializer.fields["permission_ids"]
 
         # THEN: Field is not required
@@ -216,7 +216,7 @@ class TestGroupSerializer(ViewSetTestMixin):
         group = test_group
 
         # WHEN: Creating a serializer
-        serializer = GroupSerializer(instance=group)
+        serializer = GroupReadOnlySerializer(instance=group)
 
         # THEN: Only expected fields are present
         expected_fields = ["id", "name", "permissions", "permission_ids"]
@@ -228,7 +228,7 @@ class TestGroupSerializer(ViewSetTestMixin):
         groups = Group.objects.none()
 
         # WHEN: Serializing the empty queryset
-        serializer = GroupSerializer(groups, many=True)
+        serializer = GroupReadOnlySerializer(groups, many=True)
         data = serializer.data
 
         # THEN: Empty list is returned
@@ -238,50 +238,47 @@ class TestGroupSerializer(ViewSetTestMixin):
         """Test group serializer with None instance"""
         # GIVEN: A None instance
         # WHEN: Creating a serializer with None
-        serializer = GroupSerializer(instance=None)
+        serializer = GroupReadOnlySerializer(instance=None)
         data = serializer.data
 
         # THEN: Data is an empty dict-like structure
         assert isinstance(data, dict)
 
     def test_group_serializer_validation_with_valid_data(self, test_permission, test_permission_2):
-        """Test that serializer validates correctly with valid data"""
+        """Test that serializer ignores input data since all fields are read-only"""
         # GIVEN: Valid data with existing permission ids
         permission1 = test_permission
         permission2 = test_permission_2
         data = {"name": "Valid Group", "permission_ids": [permission1.id, permission2.id]}
 
         # WHEN: Validating the data
-        serializer = GroupSerializer(data=data)
+        serializer = GroupReadOnlySerializer(data=data)
 
-        # THEN: Validation passes and data is correctly mapped
+        # THEN: Validation passes but validated_data is empty since all fields are read-only
         assert serializer.is_valid() is True
-        assert serializer.validated_data["name"] == "Valid Group"
-        assert len(serializer.validated_data["permissions"]) == 2
+        assert serializer.validated_data == {}
 
     def test_group_serializer_validation_with_invalid_permission_ids(self):
-        """Test that serializer validates with invalid permission IDs"""
+        """Test that invalid permission IDs are ignored since the field is read-only"""
         # GIVEN: Data with non-existent permission ID
         data = {"name": "Invalid Group", "permission_ids": [99999]}
 
         # WHEN: Validating the data
-        serializer = GroupSerializer(data=data)
+        serializer = GroupReadOnlySerializer(data=data)
 
-        # THEN: Validation fails with error on permission_ids
-        assert serializer.is_valid() is False
-        assert "permission_ids" in serializer.errors
+        # THEN: Validation passes since all fields are read-only and input is ignored
+        assert serializer.is_valid() is True
+        assert serializer.validated_data == {}
 
     def test_group_serializer_source_mapping(self, test_permission):
-        """Test that permission_ids correctly maps to permissions"""
+        """Test that permission_ids is not mapped to validated_data since fields are read-only"""
         # GIVEN: Data with permission_ids
         permission = test_permission
         data = {"name": "Source Test Group", "permission_ids": [permission.id]}
 
         # WHEN: Validating the data
-        serializer = GroupSerializer(data=data)
+        serializer = GroupReadOnlySerializer(data=data)
 
-        # THEN: permission_ids is mapped to permissions in validated_data
+        # THEN: validated_data is empty since all fields are read-only
         assert serializer.is_valid() is True
-        assert "permissions" in serializer.validated_data
-        assert len(serializer.validated_data["permissions"]) == 1
-        assert serializer.validated_data["permissions"][0].id == permission.id
+        assert serializer.validated_data == {}

@@ -7,7 +7,9 @@ from django.contrib.auth.password_validation import validate_password as passwor
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 
+from gardeniq.base.serializers import BaseSerializer
 from gardeniq.base.serializers import ReadOnlySerializer
 
 from .groups import GroupReadOnlySerializer
@@ -16,12 +18,15 @@ from .permissions import PermissionReadOnlySerializer
 User = get_user_model()
 
 
-class UserSerializer(serializers.Serializer):
+class UserSerializer(BaseSerializer):
     """
     Serializer for creating a new basic user.
     """
 
-    id = serializers.IntegerField(read_only=True)
+    class Meta:
+        model = User
+
+    # id = serializers.IntegerField(read_only=True)
     username = serializers.CharField(max_length=150)
 
     # Password is required on creation but optional on update
@@ -30,7 +35,11 @@ class UserSerializer(serializers.Serializer):
 
     first_name = serializers.CharField(max_length=150, allow_blank=True, required=False)
     last_name = serializers.CharField(max_length=150, allow_blank=True, required=False)
-    email = serializers.EmailField(allow_blank=True, required=False)
+    email = serializers.EmailField(
+        allow_blank=True,
+        required=False,
+        validators=[UniqueValidator(queryset=User.objects.all(), message="A user with this email already exists.")],
+    )
 
     is_staff = serializers.BooleanField(default=False, read_only=True)
     is_active = serializers.BooleanField(default=True)
@@ -65,20 +74,6 @@ class UserSerializer(serializers.Serializer):
 
         if user_qs.exists():
             raise serializers.ValidationError("A user with this username already exists.")
-        return value
-
-    def validate_email(self, value: str) -> str:
-        """
-        Validate email uniqueness if provided.
-        """
-        if value:  # Only if email is provided
-            user_qs = User.objects.filter(email=value)
-            # Allow user to keep their own email during update
-            if self.instance:
-                user_qs = user_qs.exclude(pk=self.instance.pk)
-
-            if user_qs.exists():
-                raise serializers.ValidationError("A user with this email already exists.")
         return value
 
     def validate_password(self, value: str) -> str:
@@ -119,7 +114,7 @@ class UserSerializer(serializers.Serializer):
         user_permissions = validated_data.pop("user_permissions", [])
         password = validated_data.pop("password", None)
 
-        user = User.objects.create(**validated_data)
+        user: User = super().create(validated_data)  # type: ignore
         user.set_password(password)
         user.save()
 
@@ -141,10 +136,7 @@ class UserSerializer(serializers.Serializer):
         if password:
             instance.set_password(password)
 
-        for key, value in validated_data.items():
-            if hasattr(instance, key):
-                setattr(instance, key, value)
-        instance.save()
+        instance = super().update(instance, validated_data)
 
         # Update groups and permissions if provided
         if groups is not None:

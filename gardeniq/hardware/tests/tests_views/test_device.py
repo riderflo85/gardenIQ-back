@@ -178,7 +178,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert device_obj.description == "Updated description"
 
     def test_partial_update_device(self, mock_serial_ports, authenticated_client, obj):
-        """Test partial update of a device"""
+        """Test partial update of a device is not allowed (PATCH method disabled)"""
         # GIVEN
         device_obj = obj
         url = self.get_url_detail(device_obj)
@@ -188,21 +188,10 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         response = authenticated_client.patch(url, patch_data)
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["name"] == "Partially Updated Device"
-        assert response.data["path"] == "/dev/ttyUSB0"  # unchanged
-        assert response.data["uid"] == "12AB34567890DEAD"  # unchanged
-        assert "need_upgrade" in response.data
-        assert response.data["need_upgrade"] is False
-
-        # Database verification
-        device_obj.refresh_from_db()
-        assert device_obj.name == "Partially Updated Device"
-        assert device_obj.path == "/dev/ttyUSB0"
-        assert device_obj.uid == "12AB34567890DEAD"
+        assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
     def test_partial_update_path(self, mock_serial_ports, authenticated_client, obj):
-        """Test partial update of device path"""
+        """Test partial update of device path is not allowed (PATCH method disabled)"""
         # GIVEN
         device_obj = obj
         url = self.get_url_detail(device_obj)
@@ -212,15 +201,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         response = authenticated_client.patch(url, patch_data)
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["path"] == "COM3"
-        assert response.data["name"] == "Test Device"  # unchanged
-        assert "need_upgrade" in response.data
-        assert response.data["need_upgrade"] is False
-
-        # Database verification
-        device_obj.refresh_from_db()
-        assert device_obj.path == "COM3"
+        assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
     def test_delete_device(self, authenticated_client, obj):
         """Test deleting a device"""

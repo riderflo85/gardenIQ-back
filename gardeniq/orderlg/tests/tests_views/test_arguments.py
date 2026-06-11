@@ -123,7 +123,7 @@ class TestArgumentAPIModelView(ArgumentsViewSetTestConf):
         assert argument.is_option is True
 
     def test_partial_update_argument(self, authenticated_client, obj):
-        """Test partial update of an argument"""
+        """Test partial update of an argument is not allowed (PATCH method disabled)"""
         # GIVEN
         argument = obj
         url = self.get_url_detail(argument)
@@ -133,16 +133,7 @@ class TestArgumentAPIModelView(ArgumentsViewSetTestConf):
         response = authenticated_client.patch(url, patch_data)
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["description"] == "Partially Updated Argument"
-        assert response.data["slug"] == "test-argument"  # unchanged
-        assert response.data["value_type"] == "int"  # unchanged
-
-        # Database verification
-        argument.refresh_from_db()
-        assert argument.description == "Partially Updated Argument"
-        assert argument.slug == "test-argument"
-        assert argument.value_type == "int"
+        assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
     def test_delete_argument(self, authenticated_client, obj):
         """Test deleting an argument"""

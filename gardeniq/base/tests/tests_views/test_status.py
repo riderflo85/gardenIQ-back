@@ -150,7 +150,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         assert status_obj.description == "Updated description"
 
     def test_partial_update_status(self, authenticated_client, obj):
-        """Test partial update of a status"""
+        """Test partial update of a status is not allowed (PATCH method disabled)"""
         # GIVEN
         status_obj = obj
         url = self.get_url_detail(status_obj)
@@ -160,19 +160,10 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         response = authenticated_client.patch(url, patch_data)
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["name"] == "Partially Updated Status"
-        assert response.data["tag"] == "test-status"  # unchanged
-        assert response.data["color"] == "#FF5733"  # unchanged
-
-        # Database verification
-        status_obj.refresh_from_db()
-        assert status_obj.name == "Partially Updated Status"
-        assert status_obj.tag == "test-status"
-        assert status_obj.color == "#FF5733"
+        assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
     def test_partial_update_color(self, authenticated_client, obj):
-        """Test partial update of status color"""
+        """Test partial update of status color is not allowed (PATCH method disabled)"""
         # GIVEN
         status_obj = obj
         url = self.get_url_detail(status_obj)
@@ -182,13 +173,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         response = authenticated_client.patch(url, patch_data)
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["color"] == "#123456"
-        assert response.data["name"] == "Test Status"  # unchanged
-
-        # Database verification
-        status_obj.refresh_from_db()
-        assert status_obj.color == "#123456"
+        assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
     def test_delete_status(self, authenticated_client, obj):
         """Test deleting a status"""

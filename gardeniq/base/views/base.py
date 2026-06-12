@@ -8,6 +8,7 @@ class BaseAPIModelViewSet(ModelViewSet):
     # Does read only serializers
     list_serializer_class: type[Serializer] | None = None
     detail_serializer_class: type[Serializer]
+    http_method_names = ["get", "post", "put", "delete"]
 
     def get_serializer_class(self):
         if self.action == "list":

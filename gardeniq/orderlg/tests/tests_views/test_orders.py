@@ -46,14 +46,14 @@ class OrderViewSetTestConf(ViewSetTestMixin):
 
 @pytest.mark.django_db
 class TestOrderAPIModelView(OrderViewSetTestConf):
-    def test_list(self, client_anonymous, obj):
+    def test_list(self, authenticated_client, obj):
         """Test retrieving the list of orders."""
         # GIVEN
         order1, order2 = obj  # Orders created via fixture
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = authenticated_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
@@ -70,14 +70,14 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         assert "action_type" in first_order
         assert "is_enabled" in first_order
 
-    def test_retrieve(self, client_anonymous, obj):
+    def test_retrieve(self, authenticated_client, obj):
         """Test retrieving a specific order."""
         # GIVEN
         order1, _ = obj  # Order created via fixture
         url = self.get_url_detail(order1.pk)
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = authenticated_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
@@ -87,7 +87,7 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         assert len(response.data["arguments"]) == 1
         assert response.data["arguments"][0]["id"] == order1.arguments.first().pk
 
-    def test_create(self, client_anonymous):
+    def test_create(self, authenticated_client):
         """Test creating a new order."""
         # GIVEN
         new_arg = Argument.objects.create(
@@ -106,7 +106,7 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         url = self.get_url_create()
 
         # WHEN
-        response = client_anonymous.post(url, valid_payload, format="json")
+        response = authenticated_client.post(url, valid_payload, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_201_CREATED
@@ -118,7 +118,7 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         # Check if the order was actually created in the database
         assert Order.objects.filter(name=valid_payload["name"]).exists()
 
-    def test_update(self, client_anonymous, obj):
+    def test_update(self, authenticated_client, obj):
         """Test updating an existing order."""
         # GIVEN
         order1, _ = obj  # Order to update
@@ -138,7 +138,7 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         }
 
         # WHEN
-        response = client_anonymous.put(url, update_data, format="json")
+        response = authenticated_client.put(url, update_data, format="json")
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
@@ -153,14 +153,14 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         assert updated_order.action_type == update_data["action_type"]
         assert list(updated_order.arguments.values_list("pk", flat=True)) == update_data["arguments"]
 
-    def test_delete(self, client_anonymous, obj):
+    def test_delete(self, authenticated_client, obj):
         """Test deleting an order."""
         # GIVEN
         order1, _ = obj  # Order to delete
         url = self.get_url_detail(order1.pk)
 
         # WHEN
-        response = client_anonymous.delete(url)
+        response = authenticated_client.delete(url)
 
         # THEN
         assert response.status_code == status.HTTP_204_NO_CONTENT

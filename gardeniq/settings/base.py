@@ -10,4 +10,5 @@ from gardeniq.settings.django.templates import *
 from gardeniq.settings.project.cards import *
 from gardeniq.settings.project.fixtures import *
 from gardeniq.settings.project.status import *
+from gardeniq.settings.third_party.knox import *
 from gardeniq.settings.third_party.rest_framework import *

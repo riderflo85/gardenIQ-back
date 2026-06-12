@@ -5,13 +5,15 @@ name = "pypi"
 
 [packages]
 daphne = "*"
-django = "*"
+django = "5.2.11"
 djangorestframework = "*"
 django-filter = "*"
 django-cors-headers = "*"
 django-extensions = "*"
 pyserial = "*"
 requests = "*"
+tzdata = "*"
+django-rest-knox = "*"
 
 [dev-packages]
 pytest = "*"
@@ -26,6 +28,7 @@ pre-commit-hooks = "*"
 coverage = "*"
 pytest-cov = "*"
 drf-spectacular = "*"
+colorama = "*"
 
 [requires]
 python_version = "3.13.5"

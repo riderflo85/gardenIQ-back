@@ -11,6 +11,7 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
+    "knox",
     "django_filters",
     "corsheaders",
     "drf_spectacular",
@@ -21,6 +22,7 @@ LOCAL_APPS = [
     "gardeniq.orderlg",
     "gardeniq.telemetry",
     "gardeniq.hardware",
+    "gardeniq.users",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

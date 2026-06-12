@@ -22,11 +22,13 @@ from django.urls import path
 from gardeniq.base import api_urls as base_api_urls
 from gardeniq.hardware import api_urls as hardware_api_urls
 from gardeniq.orderlg import api_urls as orderlg_api_urls
+from gardeniq.users import api_urls as users_api_urls
 
 api_urlpatterns = [
     path("", include(base_api_urls)),
     path("", include(orderlg_api_urls)),
     path("", include(hardware_api_urls)),
+    path("", include(users_api_urls)),
 ]
 
 urlpatterns = [

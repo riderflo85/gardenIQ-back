@@ -46,7 +46,7 @@ class DeviceViewSetTestConf(ViewSetTestMixin):
 
 @pytest.mark.django_db
 class TestDeviceAPIModelView(DeviceViewSetTestConf):
-    def test_list_devices(self, client_anonymous, obj):
+    def test_list_devices(self, authenticated_client, obj):
         """Test retrieving the list of devices"""
         # GIVEN
         # Device created via fixture
@@ -54,7 +54,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         expected = self.DATA_TO_DEFAULT_OBJ
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = authenticated_client.get(url)
         res_data = response.data["results"][0]
 
         # THEN
@@ -70,7 +70,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert "need_upgrade" in res_data
         assert res_data["need_upgrade"] == expected["need_upgrade"]
 
-    def test_retrieve_device(self, client_anonymous, obj):
+    def test_retrieve_device(self, authenticated_client, obj):
         """Test retrieving a specific device"""
         # GIVEN
         device_obj = obj
@@ -78,7 +78,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         expected = self.DATA_TO_DEFAULT_OBJ
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = authenticated_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
@@ -92,7 +92,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert "need_upgrade" in response.data
         assert response.data["need_upgrade"] == expected["need_upgrade"]
 
-    def test_create_device(self, mock_serial_ports, client_anonymous, status_obj):
+    def test_create_device(self, mock_serial_ports, authenticated_client, status_obj):
         """Test creating a new device"""
         # GIVEN
         device_data = {
@@ -104,7 +104,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         url = self.get_url_create()
 
         # WHEN
-        response = client_anonymous.post(url, data=device_data)
+        response = authenticated_client.post(url, data=device_data)
 
         # THEN
         assert response.status_code == status.HTTP_201_CREATED
@@ -127,7 +127,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert device_obj.status == status_obj
         assert device_obj.need_upgrade is False
 
-    def test_create_device_without_description(self, mock_serial_ports, client_anonymous, status_obj):
+    def test_create_device_without_description(self, mock_serial_ports, authenticated_client, status_obj):
         """Test creating a device without description (optional field)"""
         # GIVEN
         device_data = {
@@ -138,7 +138,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         url = self.get_url_create()
 
         # WHEN
-        response = client_anonymous.post(url, data=device_data)
+        response = authenticated_client.post(url, data=device_data)
 
         # THEN
         assert response.status_code == status.HTTP_201_CREATED
@@ -148,7 +148,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert "need_upgrade" in response.data
         assert response.data["need_upgrade"] is False
 
-    def test_update_device(self, mock_serial_ports, client_anonymous, obj, status_obj):
+    def test_update_device(self, mock_serial_ports, authenticated_client, obj, status_obj):
         """Test updating an existing device"""
         # GIVEN
         device_obj = obj
@@ -161,7 +161,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         }
 
         # WHEN
-        response = client_anonymous.put(url, update_data)
+        response = authenticated_client.put(url, update_data)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
@@ -177,52 +177,33 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert device_obj.path == "/dev/ttyUSB1"
         assert device_obj.description == "Updated description"
 
-    def test_partial_update_device(self, mock_serial_ports, client_anonymous, obj):
-        """Test partial update of a device"""
+    def test_partial_update_device(self, mock_serial_ports, authenticated_client, obj):
+        """Test partial update of a device is not allowed (PATCH method disabled)"""
         # GIVEN
         device_obj = obj
         url = self.get_url_detail(device_obj)
         patch_data = {"name": "Partially Updated Device"}
 
         # WHEN
-        response = client_anonymous.patch(url, patch_data)
+        response = authenticated_client.patch(url, patch_data)
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["name"] == "Partially Updated Device"
-        assert response.data["path"] == "/dev/ttyUSB0"  # unchanged
-        assert response.data["uid"] == "12AB34567890DEAD"  # unchanged
-        assert "need_upgrade" in response.data
-        assert response.data["need_upgrade"] is False
+        assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
-        # Database verification
-        device_obj.refresh_from_db()
-        assert device_obj.name == "Partially Updated Device"
-        assert device_obj.path == "/dev/ttyUSB0"
-        assert device_obj.uid == "12AB34567890DEAD"
-
-    def test_partial_update_path(self, mock_serial_ports, client_anonymous, obj):
-        """Test partial update of device path"""
+    def test_partial_update_path(self, mock_serial_ports, authenticated_client, obj):
+        """Test partial update of device path is not allowed (PATCH method disabled)"""
         # GIVEN
         device_obj = obj
         url = self.get_url_detail(device_obj)
         patch_data = {"path": "COM3"}
 
         # WHEN
-        response = client_anonymous.patch(url, patch_data)
+        response = authenticated_client.patch(url, patch_data)
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["path"] == "COM3"
-        assert response.data["name"] == "Test Device"  # unchanged
-        assert "need_upgrade" in response.data
-        assert response.data["need_upgrade"] is False
+        assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
-        # Database verification
-        device_obj.refresh_from_db()
-        assert device_obj.path == "COM3"
-
-    def test_delete_device(self, client_anonymous, obj):
+    def test_delete_device(self, authenticated_client, obj):
         """Test deleting a device"""
         # GIVEN
         device_obj = obj
@@ -230,7 +211,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         url = self.get_url_detail(device_obj)
 
         # WHEN
-        response = client_anonymous.delete(url)
+        response = authenticated_client.delete(url)
 
         # THEN
         assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -238,7 +219,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         with pytest.raises(Device.DoesNotExist):
             Device.objects.get(id=device_obj.id)
 
-    def test_create_device_invalid_path_format(self, mock_serial_ports, client_anonymous, status_obj):
+    def test_create_device_invalid_path_format(self, mock_serial_ports, authenticated_client, status_obj):
         """Test creating a device with an invalid path format"""
         # GIVEN
         device_data = {
@@ -249,13 +230,13 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, device_data)
+        response = authenticated_client.post(url, device_data)
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "path" in response.data
 
-    def test_create_device_path_not_in_choices(self, mock_serial_ports, client_anonymous, status_obj):
+    def test_create_device_path_not_in_choices(self, mock_serial_ports, authenticated_client, status_obj):
         """Test creating a device with a path not in available choices"""
         # GIVEN
         device_data = {
@@ -266,13 +247,13 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, device_data)
+        response = authenticated_client.post(url, device_data)
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "path" in response.data
 
-    def test_create_device_missing_name(self, mock_serial_ports, client_anonymous, status_obj):
+    def test_create_device_missing_name(self, mock_serial_ports, authenticated_client, status_obj):
         """Test creating a device without a required name field"""
         # GIVEN
         device_data = {
@@ -282,13 +263,13 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, device_data)
+        response = authenticated_client.post(url, device_data)
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "name" in response.data
 
-    def test_create_device_missing_path(self, mock_serial_ports, client_anonymous, status_obj):
+    def test_create_device_missing_path(self, mock_serial_ports, authenticated_client, status_obj):
         """Test creating a device without a required path field"""
         # GIVEN
         device_data = {
@@ -298,13 +279,13 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, device_data)
+        response = authenticated_client.post(url, device_data)
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "path" in response.data
 
-    def test_create_device_missing_status(self, mock_serial_ports, client_anonymous):
+    def test_create_device_missing_status(self, mock_serial_ports, authenticated_client):
         """Test creating a device without a required status field"""
         # GIVEN
         device_data = {
@@ -314,13 +295,13 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, device_data)
+        response = authenticated_client.post(url, device_data)
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "status" in response.data
 
-    def test_create_device_invalid_status(self, mock_serial_ports, client_anonymous):
+    def test_create_device_invalid_status(self, mock_serial_ports, authenticated_client):
         """Test creating a device with a non-existent status"""
         # GIVEN
         device_data = {
@@ -331,24 +312,24 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, device_data)
+        response = authenticated_client.post(url, device_data)
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "status" in response.data
 
-    def test_retrieve_nonexistent_device(self, client_anonymous):
+    def test_retrieve_nonexistent_device(self, authenticated_client):
         """Test retrieving a device that doesn't exist"""
         # GIVEN
         url = self.get_url_detail(99999)  # non-existent ID
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = authenticated_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_update_nonexistent_device(self, mock_serial_ports, client_anonymous, status_obj):
+    def test_update_nonexistent_device(self, mock_serial_ports, authenticated_client, status_obj):
         """Test updating a device that doesn't exist"""
         # GIVEN
         url = self.get_url_detail(99999)  # non-existent ID
@@ -359,23 +340,23 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         }
 
         # WHEN
-        response = client_anonymous.put(url, update_data)
+        response = authenticated_client.put(url, update_data)
 
         # THEN
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_delete_nonexistent_device(self, client_anonymous):
+    def test_delete_nonexistent_device(self, authenticated_client):
         """Test deleting a device that doesn't exist"""
         # GIVEN
         url = self.get_url_detail(99999)  # non-existent ID
 
         # WHEN
-        response = client_anonymous.delete(url)
+        response = authenticated_client.delete(url)
 
         # THEN
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_create_device_name_too_long(self, mock_serial_ports, client_anonymous, status_obj):
+    def test_create_device_name_too_long(self, mock_serial_ports, authenticated_client, status_obj):
         """Test creating a device with a name that's too long"""
         # GIVEN
         device_data = {
@@ -386,13 +367,13 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, device_data)
+        response = authenticated_client.post(url, device_data)
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "name" in response.data
 
-    def test_create_device_with_com_port(self, mock_serial_ports, client_anonymous, status_obj):
+    def test_create_device_with_com_port(self, mock_serial_ports, authenticated_client, status_obj):
         """Test creating a device with a Windows COM port path"""
         # GIVEN
         device_data = {
@@ -403,13 +384,13 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, device_data)
+        response = authenticated_client.post(url, device_data)
 
         # THEN
         # This might fail due to path choices, which is expected behavior
         assert response.status_code in [status.HTTP_201_CREATED, status.HTTP_400_BAD_REQUEST]
 
-    def test_create_device_with_macos_port(self, mock_serial_ports, client_anonymous, status_obj):
+    def test_create_device_with_macos_port(self, mock_serial_ports, authenticated_client, status_obj):
         """Test creating a device with a macOS cu port path"""
         # GIVEN
         device_data = {
@@ -420,13 +401,13 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, device_data)
+        response = authenticated_client.post(url, device_data)
 
         # THEN
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["path"] == "/dev/cu.usbserial-123"
 
-    def test_device_last_seen_auto_updates(self, client_anonymous, obj):
+    def test_device_last_seen_auto_updates(self, authenticated_client, obj):
         """Test that last_seen is automatically updated"""
         # GIVEN
         device_obj = obj
@@ -442,7 +423,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         # THEN
         assert device_obj.last_seen > original_last_seen
 
-    def test_device_uid_readonly(self, client_anonymous, obj):
+    def test_device_uid_readonly(self, authenticated_client, obj):
         """Test that uid field is read-only and cannot be modified"""
         # GIVEN
         device_obj = obj
@@ -450,7 +431,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         original_uid = device_obj.uid
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = authenticated_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
@@ -458,14 +439,14 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         # uid should be in response but not modifiable through API
         assert "need_upgrade" in response.data
 
-    def test_device_firmware_versions_readonly(self, client_anonymous, obj):
+    def test_device_firmware_versions_readonly(self, authenticated_client, obj):
         """Test that firmware version fields are read-only"""
         # GIVEN
         device_obj = obj
         url = self.get_url_detail(device_obj)
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = authenticated_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
@@ -473,7 +454,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert "mp_firmware_version" in response.data
         assert "need_upgrade" in response.data
 
-    def test_update_device_empty_description(self, mock_serial_ports, client_anonymous, obj, status_obj):
+    def test_update_device_empty_description(self, mock_serial_ports, authenticated_client, obj, status_obj):
         """Test updating device to have empty description"""
         # GIVEN
         device_obj = obj
@@ -486,7 +467,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         }
 
         # WHEN
-        response = client_anonymous.put(url, update_data)
+        response = authenticated_client.put(url, update_data)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK

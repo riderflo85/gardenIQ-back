@@ -20,7 +20,7 @@ class StatusViewSetTestConf(ViewSetTestMixin):
 
 @pytest.mark.django_db
 class TestStatusAPIModelView(StatusViewSetTestConf):
-    def test_list_status(self, client_anonymous, obj):
+    def test_list_status(self, authenticated_client, obj):
         """Test retrieving the list of status"""
         # GIVEN
         # Status created via fixture
@@ -28,7 +28,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         expected = self.DATA_TO_DEFAULT_OBJ
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = authenticated_client.get(url)
         res_data = response.data["results"][0]
 
         # THEN
@@ -39,7 +39,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         assert res_data["color"] == expected["color"]
         assert res_data["description"] == expected["description"]
 
-    def test_retrieve_status(self, client_anonymous, obj):
+    def test_retrieve_status(self, authenticated_client, obj):
         """Test retrieving a specific status"""
         # GIVEN
         # Status created via fixture
@@ -48,7 +48,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         expected = self.DATA_TO_DEFAULT_OBJ
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = authenticated_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
@@ -57,7 +57,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         assert response.data["color"] == expected["color"]
         assert response.data["description"] == expected["description"]
 
-    def test_create_status(self, client_anonymous):
+    def test_create_status(self, authenticated_client):
         """Test creating a new status"""
         # GIVEN
         status_data = {
@@ -69,7 +69,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         url = self.get_url_create()
 
         # WHEN
-        response = client_anonymous.post(url, data=status_data)
+        response = authenticated_client.post(url, data=status_data)
 
         # THEN
         assert response.status_code == status.HTTP_201_CREATED
@@ -84,7 +84,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         assert status_obj.color == "#00FF00"
         assert status_obj.description == "A new status description"
 
-    def test_create_status_without_description(self, client_anonymous):
+    def test_create_status_without_description(self, authenticated_client):
         """Test creating a status without description (optional field)"""
         # GIVEN
         status_data = {
@@ -95,7 +95,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         url = self.get_url_create()
 
         # WHEN
-        response = client_anonymous.post(url, data=status_data)
+        response = authenticated_client.post(url, data=status_data)
 
         # THEN
         assert response.status_code == status.HTTP_201_CREATED
@@ -104,7 +104,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         assert response.data["color"] == "#0000FF"
         assert response.data["description"] == ""
 
-    def test_create_status_with_default_color(self, client_anonymous):
+    def test_create_status_with_default_color(self, authenticated_client):
         """Test creating a status with default color"""
         # GIVEN
         status_data = {
@@ -114,13 +114,13 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         url = self.get_url_create()
 
         # WHEN
-        response = client_anonymous.post(url, data=status_data)
+        response = authenticated_client.post(url, data=status_data)
 
         # THEN
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["color"] == Status.DEFAULT_COLOR
 
-    def test_update_status(self, client_anonymous, obj):
+    def test_update_status(self, authenticated_client, obj):
         """Test updating an existing status"""
         # GIVEN
         status_obj = obj
@@ -133,7 +133,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         }
 
         # WHEN
-        response = client_anonymous.put(url, update_data)
+        response = authenticated_client.put(url, update_data)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
@@ -149,48 +149,33 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         assert status_obj.color == "#FF0000"
         assert status_obj.description == "Updated description"
 
-    def test_partial_update_status(self, client_anonymous, obj):
-        """Test partial update of a status"""
+    def test_partial_update_status(self, authenticated_client, obj):
+        """Test partial update of a status is not allowed (PATCH method disabled)"""
         # GIVEN
         status_obj = obj
         url = self.get_url_detail(status_obj)
         patch_data = {"name": "Partially Updated Status"}
 
         # WHEN
-        response = client_anonymous.patch(url, patch_data)
+        response = authenticated_client.patch(url, patch_data)
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["name"] == "Partially Updated Status"
-        assert response.data["tag"] == "test-status"  # unchanged
-        assert response.data["color"] == "#FF5733"  # unchanged
+        assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
-        # Database verification
-        status_obj.refresh_from_db()
-        assert status_obj.name == "Partially Updated Status"
-        assert status_obj.tag == "test-status"
-        assert status_obj.color == "#FF5733"
-
-    def test_partial_update_color(self, client_anonymous, obj):
-        """Test partial update of status color"""
+    def test_partial_update_color(self, authenticated_client, obj):
+        """Test partial update of status color is not allowed (PATCH method disabled)"""
         # GIVEN
         status_obj = obj
         url = self.get_url_detail(status_obj)
         patch_data = {"color": "#123456"}
 
         # WHEN
-        response = client_anonymous.patch(url, patch_data)
+        response = authenticated_client.patch(url, patch_data)
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["color"] == "#123456"
-        assert response.data["name"] == "Test Status"  # unchanged
+        assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
-        # Database verification
-        status_obj.refresh_from_db()
-        assert status_obj.color == "#123456"
-
-    def test_delete_status(self, client_anonymous, obj):
+    def test_delete_status(self, authenticated_client, obj):
         """Test deleting a status"""
         # GIVEN
         status_obj = obj
@@ -198,7 +183,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         url = self.get_url_detail(status_obj)
 
         # WHEN
-        response = client_anonymous.delete(url)
+        response = authenticated_client.delete(url)
 
         # THEN
         assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -206,7 +191,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         with pytest.raises(Status.DoesNotExist):
             Status.objects.get(id=status_obj.id)
 
-    def test_create_status_invalid_color_format(self, client_anonymous):
+    def test_create_status_invalid_color_format(self, authenticated_client):
         """Test creating a status with an invalid color format"""
         # GIVEN
         status_data = {
@@ -217,13 +202,13 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, status_data)
+        response = authenticated_client.post(url, status_data)
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "color" in response.data
 
-    def test_create_status_invalid_color_too_long(self, client_anonymous):
+    def test_create_status_invalid_color_too_long(self, authenticated_client):
         """Test creating a status with a color that's too long"""
         # GIVEN
         status_data = {
@@ -234,13 +219,13 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, status_data)
+        response = authenticated_client.post(url, status_data)
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "color" in response.data
 
-    def test_create_status_invalid_color_missing_hash(self, client_anonymous):
+    def test_create_status_invalid_color_missing_hash(self, authenticated_client):
         """Test creating a status with a color missing the # symbol"""
         # GIVEN
         status_data = {
@@ -251,13 +236,13 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, status_data)
+        response = authenticated_client.post(url, status_data)
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "color" in response.data
 
-    def test_create_status_short_color_format(self, client_anonymous):
+    def test_create_status_short_color_format(self, authenticated_client):
         """Test creating a status with a valid short color format (#RGB)"""
         # GIVEN
         status_data = {
@@ -268,13 +253,13 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, status_data)
+        response = authenticated_client.post(url, status_data)
 
         # THEN
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["color"] == "#F5A"
 
-    def test_create_status_missing_name(self, client_anonymous):
+    def test_create_status_missing_name(self, authenticated_client):
         """Test creating a status without a required name field"""
         # GIVEN
         status_data = {
@@ -284,13 +269,13 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, status_data)
+        response = authenticated_client.post(url, status_data)
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "name" in response.data
 
-    def test_create_status_missing_tag(self, client_anonymous):
+    def test_create_status_missing_tag(self, authenticated_client):
         """Test creating a status without a required tag field"""
         # GIVEN
         status_data = {
@@ -300,13 +285,13 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, status_data)
+        response = authenticated_client.post(url, status_data)
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "tag" in response.data
 
-    def test_create_status_invalid_tag_format(self, client_anonymous):
+    def test_create_status_invalid_tag_format(self, authenticated_client):
         """Test creating a status with an invalid tag format (slug validation)"""
         # GIVEN
         status_data = {
@@ -317,24 +302,24 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, status_data)
+        response = authenticated_client.post(url, status_data)
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "tag" in response.data
 
-    def test_retrieve_nonexistent_status(self, client_anonymous):
+    def test_retrieve_nonexistent_status(self, authenticated_client):
         """Test retrieving a status that doesn't exist"""
         # GIVEN
         url = self.get_url_detail(99999)  # non-existent ID
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = authenticated_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_update_nonexistent_status(self, client_anonymous):
+    def test_update_nonexistent_status(self, authenticated_client):
         """Test updating a status that doesn't exist"""
         # GIVEN
         url = self.get_url_detail(99999)  # non-existent ID
@@ -345,18 +330,18 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         }
 
         # WHEN
-        response = client_anonymous.put(url, update_data)
+        response = authenticated_client.put(url, update_data)
 
         # THEN
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_delete_nonexistent_status(self, client_anonymous):
+    def test_delete_nonexistent_status(self, authenticated_client):
         """Test deleting a status that doesn't exist"""
         # GIVEN
         url = self.get_url_detail(99999)  # non-existent ID
 
         # WHEN
-        response = client_anonymous.delete(url)
+        response = authenticated_client.delete(url)
 
         # THEN
         assert response.status_code == status.HTTP_404_NOT_FOUND

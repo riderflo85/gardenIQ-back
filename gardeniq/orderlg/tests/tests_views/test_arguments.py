@@ -21,7 +21,7 @@ class ArgumentsViewSetTestConf(ViewSetTestMixin):
 
 @pytest.mark.django_db
 class TestArgumentAPIModelView(ArgumentsViewSetTestConf):
-    def test_list_arguments(self, client_anonymous, obj):
+    def test_list_arguments(self, authenticated_client, obj):
         """Test retrieving the list of arguments"""
         # GIVEN
         # Argument created via fixture
@@ -29,7 +29,7 @@ class TestArgumentAPIModelView(ArgumentsViewSetTestConf):
         excepted = self.DATA_TO_DEFAULT_OBJ
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = authenticated_client.get(url)
         res_data = response.data["results"][0]
 
         # THEN
@@ -41,7 +41,7 @@ class TestArgumentAPIModelView(ArgumentsViewSetTestConf):
         assert res_data["required"] is True
         assert res_data["is_option"] is False
 
-    def test_retrieve_argument(self, client_anonymous, obj):
+    def test_retrieve_argument(self, authenticated_client, obj):
         """Test retrieving a specific argument"""
         # GIVEN
         # Argument created via fixture
@@ -50,7 +50,7 @@ class TestArgumentAPIModelView(ArgumentsViewSetTestConf):
         excepted = self.DATA_TO_DEFAULT_OBJ
 
         # WHEN
-        response = client_anonymous.get(url)
+        response = authenticated_client.get(url)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
@@ -60,7 +60,7 @@ class TestArgumentAPIModelView(ArgumentsViewSetTestConf):
         assert response.data["required"] is True
         assert response.data["is_option"] is False
 
-    def test_create_argument(self, client_anonymous):
+    def test_create_argument(self, authenticated_client):
         """Test creating a new argument"""
         # GIVEN
         argument_data = {
@@ -73,7 +73,7 @@ class TestArgumentAPIModelView(ArgumentsViewSetTestConf):
         url = self.get_url_create()
 
         # WHEN
-        response = client_anonymous.post(url, data=argument_data)
+        response = authenticated_client.post(url, data=argument_data)
 
         # THEN
         assert response.status_code == status.HTTP_201_CREATED
@@ -90,7 +90,7 @@ class TestArgumentAPIModelView(ArgumentsViewSetTestConf):
         assert argument.required is False
         assert argument.is_option is True
 
-    def test_update_argument(self, client_anonymous, obj):
+    def test_update_argument(self, authenticated_client, obj):
         """Test updating an existing argument"""
         # GIVEN
         argument = obj
@@ -104,7 +104,7 @@ class TestArgumentAPIModelView(ArgumentsViewSetTestConf):
         }
 
         # WHEN
-        response = client_anonymous.put(url, update_data)
+        response = authenticated_client.put(url, update_data)
 
         # THEN
         assert response.status_code == status.HTTP_200_OK
@@ -122,29 +122,20 @@ class TestArgumentAPIModelView(ArgumentsViewSetTestConf):
         assert argument.required is False
         assert argument.is_option is True
 
-    def test_partial_update_argument(self, client_anonymous, obj):
-        """Test partial update of an argument"""
+    def test_partial_update_argument(self, authenticated_client, obj):
+        """Test partial update of an argument is not allowed (PATCH method disabled)"""
         # GIVEN
         argument = obj
         url = self.get_url_detail(argument)
         patch_data = {"description": "Partially Updated Argument"}
 
         # WHEN
-        response = client_anonymous.patch(url, patch_data)
+        response = authenticated_client.patch(url, patch_data)
 
         # THEN
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["description"] == "Partially Updated Argument"
-        assert response.data["slug"] == "test-argument"  # unchanged
-        assert response.data["value_type"] == "int"  # unchanged
+        assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
-        # Database verification
-        argument.refresh_from_db()
-        assert argument.description == "Partially Updated Argument"
-        assert argument.slug == "test-argument"
-        assert argument.value_type == "int"
-
-    def test_delete_argument(self, client_anonymous, obj):
+    def test_delete_argument(self, authenticated_client, obj):
         """Test deleting an argument"""
         # GIVEN
         argument = obj
@@ -152,7 +143,7 @@ class TestArgumentAPIModelView(ArgumentsViewSetTestConf):
         url = self.get_url_detail(argument)
 
         # WHEN
-        response = client_anonymous.delete(url)
+        response = authenticated_client.delete(url)
 
         # THEN
         assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -160,7 +151,7 @@ class TestArgumentAPIModelView(ArgumentsViewSetTestConf):
         with pytest.raises(Argument.DoesNotExist):
             Argument.objects.get(id=argument.id)
 
-    def test_create_argument_invalid_value_type(self, client_anonymous):
+    def test_create_argument_invalid_value_type(self, authenticated_client):
         """Test creating an argument with an invalid value type"""
         # GIVEN
         argument_data = {
@@ -173,7 +164,7 @@ class TestArgumentAPIModelView(ArgumentsViewSetTestConf):
         url = self.get_url_list()
 
         # WHEN
-        response = client_anonymous.post(url, argument_data)
+        response = authenticated_client.post(url, argument_data)
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST

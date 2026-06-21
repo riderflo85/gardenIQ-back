@@ -50,7 +50,6 @@ class TestManager:
         # GIVEN
         expected_seeders_name = [
             "StatusSeeder",
-            "ArgumentSeeder",
             "OrderSeeder",
         ]
 
@@ -68,7 +67,7 @@ class TestManager:
     @pytest.mark.parametrize(
         "app_name, expected_seeders_name",
         [
-            ("orderlg", ["ArgumentSeeder", "OrderSeeder"]),
+            ("orderlg", ["OrderSeeder"]),
             ("base", ["StatusSeeder"]),
         ],
     )

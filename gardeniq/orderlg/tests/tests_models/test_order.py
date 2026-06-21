@@ -1,43 +1,6 @@
 import pytest
 
-from gardeniq.orderlg.models import Argument
 from gardeniq.orderlg.models import Order
-
-
-@pytest.fixture
-def argument_sensor_id():
-    """Fixture providing an Argument for sensor ID."""
-    return Argument.objects.create(
-        description="Sensor ID to query",
-        slug="sensor-id",
-        value_type="int",
-        required=True,
-        is_option=False,
-    )
-
-
-@pytest.fixture
-def argument_verbose():
-    """Fixture providing an Argument for verbose mode."""
-    return Argument.objects.create(
-        description="Verbose mode",
-        slug="verbose",
-        value_type="bool",
-        required=False,
-        is_option=True,
-    )
-
-
-@pytest.fixture
-def argument_debug():
-    """Fixture providing an Argument for debug mode."""
-    return Argument.objects.create(
-        description="Debug mode",
-        slug="debug",
-        value_type="bool",
-        required=False,
-        is_option=True,
-    )
 
 
 @pytest.fixture
@@ -140,23 +103,6 @@ class TestOrderCreation:
         # THEN
         assert order.pk is not None
         assert order.action_type == "set"
-
-    def test_create_order_with_arguments(self, order_data, argument_sensor_id, argument_verbose):
-        """
-        GIVEN: an Order and multiple Arguments
-        WHEN: creating an Order and adding Arguments to it
-        THEN: the Order is created with the correct Arguments
-        """
-        # GIVEN - fixtures provide the data and arguments
-
-        # WHEN
-        order = Order.objects.create(**order_data)
-        order.arguments.add(argument_sensor_id, argument_verbose)
-
-        # THEN
-        assert order.arguments.count() == 2
-        assert argument_sensor_id in order.arguments.all()
-        assert argument_verbose in order.arguments.all()
 
 
 @pytest.mark.django_db
@@ -453,117 +399,6 @@ class TestOrderManager:
         assert enabled_orders.count() == 2
         assert enabled_order1 in enabled_orders
         assert enabled_order2 in enabled_orders
-
-
-@pytest.mark.django_db
-class TestOrderArgumentsRelationship:
-    """Tests for Order and Argument ManyToMany relationship."""
-
-    def test_add_single_argument_to_order(self, order_data, argument_sensor_id):
-        """
-        GIVEN: an Order and an Argument
-        WHEN: adding the Argument to the Order
-        THEN: the Order has the Argument in its arguments
-        """
-        # GIVEN
-        order = Order.objects.create(**order_data)
-
-        # WHEN
-        order.arguments.add(argument_sensor_id)
-
-        # THEN
-        assert order.arguments.count() == 1
-        assert argument_sensor_id in order.arguments.all()
-
-    def test_add_multiple_arguments_to_order(self, order_data, argument_sensor_id, argument_verbose, argument_debug):
-        """
-        GIVEN: an Order and multiple Arguments
-        WHEN: adding multiple Arguments to the Order
-        THEN: the Order has all Arguments in its arguments
-        """
-        # GIVEN
-        order = Order.objects.create(**order_data)
-
-        # WHEN
-        order.arguments.add(argument_sensor_id, argument_verbose, argument_debug)
-
-        # THEN
-        assert order.arguments.count() == 3
-        assert argument_sensor_id in order.arguments.all()
-        assert argument_verbose in order.arguments.all()
-        assert argument_debug in order.arguments.all()
-
-    def test_remove_argument_from_order(self, order_data, argument_sensor_id, argument_verbose):
-        """
-        GIVEN: an Order with multiple Arguments
-        WHEN: removing one Argument from the Order
-        THEN: the Order no longer has the removed Argument
-        """
-        # GIVEN
-        order = Order.objects.create(**order_data)
-        order.arguments.add(argument_sensor_id, argument_verbose)
-        assert order.arguments.count() == 2
-
-        # WHEN
-        order.arguments.remove(argument_sensor_id)
-
-        # THEN
-        assert order.arguments.count() == 1
-        assert argument_sensor_id not in order.arguments.all()
-        assert argument_verbose in order.arguments.all()
-
-    def test_clear_all_arguments_from_order(self, order_data, argument_sensor_id, argument_verbose):
-        """
-        GIVEN: an Order with multiple Arguments
-        WHEN: clearing all Arguments from the Order
-        THEN: the Order has no Arguments
-        """
-        # GIVEN
-        order = Order.objects.create(**order_data)
-        order.arguments.add(argument_sensor_id, argument_verbose)
-        assert order.arguments.count() == 2
-
-        # WHEN
-        order.arguments.clear()
-
-        # THEN
-        assert order.arguments.count() == 0
-
-    def test_argument_can_belong_to_multiple_orders(self, order_data, order_setter_data, argument_sensor_id):
-        """
-        GIVEN: multiple Orders and one Argument
-        WHEN: adding the same Argument to multiple Orders
-        THEN: the Argument belongs to all Orders
-        """
-        # GIVEN
-        order1 = Order.objects.create(**order_data)
-        order2 = Order.objects.create(**order_setter_data)
-
-        # WHEN
-        order1.arguments.add(argument_sensor_id)
-        order2.arguments.add(argument_sensor_id)
-
-        # THEN
-        assert argument_sensor_id in order1.arguments.all()
-        assert argument_sensor_id in order2.arguments.all()
-        assert argument_sensor_id.orders.count() == 2
-
-    def test_deleting_argument_removes_from_order(self, order_data, argument_sensor_id):
-        """
-        GIVEN: an Order with an Argument
-        WHEN: deleting the Argument
-        THEN: the Order no longer has the Argument
-        """
-        # GIVEN
-        order = Order.objects.create(**order_data)
-        order.arguments.add(argument_sensor_id)
-        assert order.arguments.count() == 1
-
-        # WHEN
-        argument_sensor_id.delete()
-
-        # THEN
-        assert order.arguments.count() == 0
 
 
 @pytest.mark.django_db

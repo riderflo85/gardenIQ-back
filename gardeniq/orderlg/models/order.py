@@ -7,7 +7,6 @@ from gardeniq.base.models import NameMixinModel
 from gardeniq.base.models import ProtectedDeletedMixinModel
 from gardeniq.base.models import ProtectedDisabledMixinModel
 from gardeniq.base.models import SlugMixinModel
-from gardeniq.orderlg.models import Argument
 
 
 class Order(
@@ -34,12 +33,6 @@ class Order(
         max_length=10,
         choices=ACTIONS_CHOICES,
         verbose_name="action type",
-    )
-    arguments = models.ManyToManyField(
-        Argument,
-        related_name="orders",
-        verbose_name="arguments",
-        help_text="All the arguments necessary for the command to work.",
     )
 
     class Meta:

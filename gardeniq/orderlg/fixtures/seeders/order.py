@@ -9,6 +9,3 @@ class OrderSeeder(OrderlgSeeder):
     model = Order
     serializer = OrderSerializer
     search_field_name = ["slug"]
-    dependencies = [
-        "ArgumentSeeder",
-    ]

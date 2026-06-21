@@ -1,18 +1,12 @@
 from gardeniq.base.routers import ToggleObjectRouter
-from gardeniq.orderlg.views import ArgumentAPIModelView
-from gardeniq.orderlg.views import OrderAPIModelView
+from gardeniq.orderlg import views
 
 __all__ = ["urlpatterns"]
 
 router = ToggleObjectRouter()
 router.register(
-    r"arguments",
-    ArgumentAPIModelView,
-    basename="arguments",
-)
-router.register(
     r"orders",
-    OrderAPIModelView,
+    views.OrderAPIModelView,
     basename="orders",
 )
 

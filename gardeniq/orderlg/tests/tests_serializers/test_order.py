@@ -1,6 +1,5 @@
 import pytest
 
-from gardeniq.orderlg.models import Argument
 from gardeniq.orderlg.models import Order
 from gardeniq.orderlg.serializers import OrderDetailReadOnlySerializer
 from gardeniq.orderlg.serializers import OrderListReadOnlySerializer
@@ -8,49 +7,29 @@ from gardeniq.orderlg.serializers import OrderSerializer
 
 
 @pytest.fixture
-def create_arguments():
-    arg1 = Argument.objects.create(
-        description="Test Argument 1",
-        slug="test-argument-1",
-        value_type="int",
-    )
-    arg2 = Argument.objects.create(
-        description="Test Argument 2",
-        slug="test-argument-2",
-        value_type="int",
-    )
-    return arg1, arg2
-
-
-@pytest.fixture
-def create_order(create_arguments):
-    arg1, arg2 = create_arguments
+def create_order():
     order = Order.objects.create(
         name="Test Order",
         description="Test Order Description",
         action_type="get",
     )
-    order.arguments.set([arg1, arg2])
     return order
 
 
 @pytest.mark.django_db
 class TestOrderSerializer:
-    def test_valide_serializer(self, create_arguments):
-        arg1, arg2 = create_arguments
+    def test_valide_serializer(self):
         # GIVEN
         data = {
             "name": "Test Order",
             "description": "Test Order Description",
             "action_type": "get",
-            "arguments": [arg1.pk, arg2.pk],
         }
         expected = {
             "name": "Test Order",
             "description": "Test Order Description",
             "slug": "test-order",
             "action_type": "get",
-            "arguments": [arg1.pk, arg2.pk],
             "is_enabled": True,
         }
 
@@ -62,14 +41,12 @@ class TestOrderSerializer:
         assert serializer.is_valid()
         assert serializer.data == expected
 
-    def test_create_order(self, create_arguments):
-        arg1, arg2 = create_arguments
+    def test_create_order(self):
         # GIVEN
         data = {
             "name": "Test Order",
             "description": "Test Order Description",
             "action_type": "get",
-            "arguments": [arg1.pk, arg2.pk],
         }
 
         # WHEN
@@ -84,17 +61,14 @@ class TestOrderSerializer:
         assert order.slug == "test-order"
         assert order.description == data["description"]
         assert order.action_type == data["action_type"]
-        assert order.arguments.count() == 2
 
-    def test_create_order_with_custom_slug(self, create_arguments):
-        arg1, arg2 = create_arguments
+    def test_create_order_with_custom_slug(self):
         # GIVEN
         data = {
             "name": "Test Order",
             "slug": "my-custom-slug-test-order",
             "description": "Test Order Description",
             "action_type": "get",
-            "arguments": [arg1.pk, arg2.pk],
         }
 
         # WHEN
@@ -109,10 +83,8 @@ class TestOrderSerializer:
         assert order.slug == data["slug"]
         assert order.description == data["description"]
         assert order.action_type == data["action_type"]
-        assert order.arguments.count() == 2
 
-    def test_update_serializer(self, create_arguments):
-        arg1, arg2 = create_arguments
+    def test_update_serializer(self):
         # GIVEN
         data = {
             "name": "Test Update Order",
@@ -120,12 +92,10 @@ class TestOrderSerializer:
             "action_type": "set",
         }
         order = Order.objects.create(**data)
-        order.arguments.set([arg1])
         updated_data = {
             "name": "New name for Test Update Order",
             "description": "New description for Test Update Order Description",
             "action_type": "get",
-            "arguments": [arg1.pk, arg2.pk],
         }
 
         # WHEN
@@ -139,7 +109,6 @@ class TestOrderSerializer:
         assert order.slug == "new-name-for-test-update-order"
         assert order.description == updated_data["description"]
         assert order.action_type == updated_data["action_type"]
-        assert order.arguments.count() == 2
 
 
 @pytest.mark.django_db
@@ -200,22 +169,19 @@ class TestOrderListReadOnlySerializer:
         # THEN
         assert serializer.data == expected
 
-    def test_list_serializer_multiple_orders(self, create_arguments):
+    def test_list_serializer_multiple_orders(self):
         # GIVEN
-        arg1, arg2 = create_arguments
         order1 = Order.objects.create(
             name="First Order",
             description="First Description",
             action_type="get",
         )
-        order1.arguments.set([arg1])
 
         order2 = Order.objects.create(
             name="Second Order",
             description="Second Description",
             action_type="set",
         )
-        order2.arguments.set([arg2])
 
         expected = [
             {
@@ -250,16 +216,6 @@ class TestOrderDetailReadOnlySerializer:
             "name": "Test Order",
             "description": "Test Order Description",
             "action_type": "get",
-            "arguments": [
-                {
-                    "description": "my description, blabla",
-                    "slug": "my-description-blabla",
-                    "is_enabled": True,
-                    "value_type": "int",
-                    "required": True,
-                    "is_option": False,
-                },
-            ],
         }
 
         # WHEN
@@ -304,18 +260,6 @@ class TestOrderDetailReadOnlySerializer:
             "slug": order.slug,
             "action_type": order.action_type,
             "is_enabled": order.is_enabled,
-            "arguments": [
-                {
-                    "id": arg.pk,
-                    "description": arg.description,
-                    "slug": arg.slug,
-                    "is_enabled": arg.is_enabled,
-                    "value_type": arg.value_type,
-                    "required": arg.required,
-                    "is_option": arg.is_option,
-                }
-                for arg in order.arguments.all()
-            ],
         }
 
         # WHEN

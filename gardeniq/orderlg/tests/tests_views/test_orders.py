@@ -5,7 +5,6 @@ from rest_framework import status
 import pytest
 
 from gardeniq.base.utils.tests import ViewSetTestMixin
-from gardeniq.orderlg.models import Argument
 from gardeniq.orderlg.models import Order
 
 
@@ -20,27 +19,8 @@ class OrderViewSetTestConf(ViewSetTestMixin):
     }
 
     def generate_default_obj(self) -> tuple[Model, Model]:
-        arg1 = Argument.objects.create(
-            description="Test argument 1",
-            slug="test-arg1",
-            value_type="str",
-            required=True,
-            is_option=False,
-        )
-        arg2 = Argument.objects.create(
-            description="Test argument 2",
-            slug="test-arg2",
-            value_type="int",
-            required=False,
-            is_option=False,
-        )
-
-        # Create many orders for tests
         order1 = Order.objects.create(name="Test Order 1", description="First test order", action_type="get")
-        order1.arguments.set([arg1])
-
         order2 = Order.objects.create(name="Test Order 2", description="Second test order", action_type="set")
-        order2.arguments.set([arg1, arg2])
         return order1, order2
 
 
@@ -84,24 +64,14 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         assert response.data["name"] == order1.name
         assert response.data["description"] == order1.description
         assert response.data["action_type"] == order1.action_type
-        assert len(response.data["arguments"]) == 1
-        assert response.data["arguments"][0]["id"] == order1.arguments.first().pk
 
     def test_create(self, authenticated_client):
         """Test creating a new order."""
         # GIVEN
-        new_arg = Argument.objects.create(
-            description="Test argument 34",
-            slug="test-arg34",
-            value_type="str",
-            required=True,
-            is_option=False,
-        )
         valid_payload = {
             "name": "New Order",
             "description": "A new test order",
             "action_type": "get",
-            "arguments": [new_arg.pk],
         }
         url = self.get_url_create()
 
@@ -113,7 +83,6 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         assert response.data["name"] == valid_payload["name"]
         assert response.data["description"] == valid_payload["description"]
         assert response.data["action_type"] == valid_payload["action_type"]
-        assert response.data["arguments"] == valid_payload["arguments"]
 
         # Check if the order was actually created in the database
         assert Order.objects.filter(name=valid_payload["name"]).exists()
@@ -123,18 +92,10 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         # GIVEN
         order1, _ = obj  # Order to update
         url = self.get_url_detail(order1.pk)
-        new_arg = Argument.objects.create(
-            description="Test argument 54",
-            slug="test-arg54",
-            value_type="str",
-            required=True,
-            is_option=False,
-        )
         update_data = {
             "name": "Updated Order",
             "description": "Updated description",
             "action_type": "set",
-            "arguments": [new_arg.pk],
         }
 
         # WHEN
@@ -145,13 +106,11 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         assert response.data["name"] == update_data["name"]
         assert response.data["description"] == update_data["description"]
         assert response.data["action_type"] == update_data["action_type"]
-        assert response.data["arguments"] == update_data["arguments"]
 
         # Check if the order was actually updated in the database
         updated_order = Order.objects.get(pk=order1.pk)
         assert updated_order.name == update_data["name"]
         assert updated_order.action_type == update_data["action_type"]
-        assert list(updated_order.arguments.values_list("pk", flat=True)) == update_data["arguments"]
 
     def test_delete(self, authenticated_client, obj):
         """Test deleting an order."""

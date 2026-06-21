@@ -5,7 +5,6 @@ from django.core.management import call_command
 import pytest
 
 from gardeniq.base.models import Status
-from gardeniq.orderlg.models import Argument
 from gardeniq.orderlg.models import Order
 
 
@@ -13,7 +12,6 @@ from gardeniq.orderlg.models import Order
 class TestCommands:
     def test_seed_all_apps_command(self):
         # GIVEN
-        arg_counter_before_seed = Argument.objects.count()
         order_counter_before_seed = Order.objects.count()
         status_counter_before_seed = Status.objects.count()
         out = StringIO()
@@ -22,14 +20,13 @@ class TestCommands:
         call_command("seed", stdout=out)
 
         # THEN
-        assert Argument.objects.count() > arg_counter_before_seed
         assert Order.objects.count() > order_counter_before_seed
         assert Status.objects.count() > status_counter_before_seed
 
     @pytest.mark.parametrize(
         "app_name, model_obj",
         [
-            ("orderlg", [Argument, Order]),
+            ("orderlg", [Order]),
             ("base", [Status]),
         ],
     )

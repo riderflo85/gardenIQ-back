@@ -1,6 +1,9 @@
 from rest_framework.serializers import Serializer
 from rest_framework.viewsets import ModelViewSet
 
+CRUD_HTTP_METHODS = ["get", "post", "put", "delete"]
+READ_ONLY_HTTP_METHODS = ["get"]
+
 
 class BaseAPIModelViewSet(ModelViewSet):
     serializer_class: type[Serializer]
@@ -8,7 +11,7 @@ class BaseAPIModelViewSet(ModelViewSet):
     # Does read only serializers
     list_serializer_class: type[Serializer] | None = None
     detail_serializer_class: type[Serializer]
-    http_method_names = ["get", "post", "put", "delete"]
+    http_method_names = CRUD_HTTP_METHODS
 
     def get_serializer_class(self):
         if self.action == "list":

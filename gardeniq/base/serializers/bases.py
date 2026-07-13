@@ -4,6 +4,7 @@ from django.db.models import Model
 
 from rest_framework import serializers
 
+from .mixins import NameMixinSerializer
 from .mixins import PKMixinSerializer
 
 
@@ -56,3 +57,7 @@ class ReadOnlySerializer(serializers.Serializer):
         Override save to prevent saving.
         """
         raise NotImplementedError(f"{self.__class__.__name__} is read-only and cannot save objects.")
+
+
+class MinimalReadOnlySerializer(ReadOnlySerializer, PKMixinSerializer, NameMixinSerializer):
+    pass

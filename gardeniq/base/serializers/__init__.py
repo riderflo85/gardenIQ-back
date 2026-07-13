@@ -1,4 +1,5 @@
 from .bases import BaseSerializer
+from .bases import MinimalReadOnlySerializer
 from .bases import ReadOnlySerializer
 from .mixins import AutocompleteSlugMixinSerializer
 from .mixins import DescriptionMixinSerializer

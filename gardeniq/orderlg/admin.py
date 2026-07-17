@@ -22,5 +22,9 @@ class OrderAdmin(admin.ModelAdmin):
         "slug",
         "description",
         "action_type",
+        "sensor",
+        "controller",
+        "is_toggle_ctrl_value",
+        "ctrl_value",
         "is_enabled",
     )

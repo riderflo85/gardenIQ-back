@@ -11,3 +11,12 @@ class OrderAPIModelView(DisableAPIViewMixin, BaseAPIModelViewSet):
     list_serializer_class = OrderListReadOnlySerializer
     detail_serializer_class = OrderDetailReadOnlySerializer
     queryset = Order.objects.all()
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.action in ("list", "retrieve"):
+            qs = qs.select_related(
+                "sensor",
+                "controller",
+            )
+        return qs

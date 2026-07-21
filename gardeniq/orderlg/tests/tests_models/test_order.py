@@ -1,37 +1,130 @@
+from django.db import IntegrityError
+
 import pytest
 
+from gardeniq.base.models import Status
+from gardeniq.hardware.models import Channel
+from gardeniq.hardware.models import Controller
+from gardeniq.hardware.models import ControllerCategory
+from gardeniq.hardware.models import Device
+from gardeniq.hardware.models import Pin
+from gardeniq.hardware.models import Sensor
+from gardeniq.hardware.models import SensorCategory
 from gardeniq.orderlg.models import Order
+
+# ─── Hardware Fixtures ──────────────────────────────────────────────────────────
 
 
 @pytest.fixture
-def order_data():
-    """Fixture providing basic data to create an Order."""
+def device_status(db):
+    return Status.objects.create(name="Generic", tag="device-generic", color="#123456")
+
+
+@pytest.fixture
+def device(device_status):
+    return Device.objects.create(
+        name="Test Device",
+        uid="AABBCCDDEEFF0011",
+        path="/dev/ttyUSB0",
+        status=device_status,
+    )
+
+
+@pytest.fixture
+def channel(db):
+    return Channel.objects.create(name="Analog")
+
+
+@pytest.fixture
+def pin(device, channel):
+    p = Pin.objects.create(
+        device=device,
+        channel_choiced=channel,
+        pin_number=1,
+    )
+    p.channels_available.set([channel])
+    return p
+
+
+@pytest.fixture
+def pin2(device, channel):
+    p = Pin.objects.create(
+        device=device,
+        channel_choiced=channel,
+        pin_number=2,
+    )
+    p.channels_available.set([channel])
+    return p
+
+
+@pytest.fixture
+def sensor_category(db):
+    return SensorCategory.objects.create(name="Temperature", unity_value="°C")
+
+
+@pytest.fixture
+def sensor(sensor_category, device, pin):
+    return Sensor.objects.create(
+        name="Main Temp Sensor",
+        category=sensor_category,
+        device=device,
+        pin=pin,
+    )
+
+
+@pytest.fixture
+def controller_category(db):
+    return ControllerCategory.objects.create(name="Relay")
+
+
+@pytest.fixture
+def controller(controller_category, device, pin2):
+    return Controller.objects.create(
+        name="Main Relay",
+        category=controller_category,
+        device=device,
+        pin=pin2,
+    )
+
+
+# ─── Order Fixtures ─────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def order_data(sensor):
+    """Fixture providing basic data to create a getter Order."""
     return {
         "name": "Get Temperature",
         "description": "Retrieve temperature from sensor",
         "slug": "get-temperature",
         "action_type": "get",
+        "sensor": sensor,
     }
 
 
 @pytest.fixture
-def order_setter_data():
+def order_setter_data(controller):
     """Fixture providing data for a setter Order."""
     return {
         "name": "Set LED State",
         "description": "Set the state of the LED",
         "slug": "set-led-state",
         "action_type": "set",
+        "controller": controller,
     }
 
 
 @pytest.fixture
-def order_minimal_data():
+def order_minimal_data(sensor):
     """Fixture providing minimal data relying on defaults."""
     return {
         "name": "Check Status",
         "action_type": "get",
+        "sensor": sensor,
     }
+
+
+# ─── TestOrderCreation ─────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -40,7 +133,7 @@ class TestOrderCreation:
 
     def test_create_order_with_all_fields(self, order_data):
         """
-        GIVEN: complete data for an Order
+        GIVEN: complete data for a getter Order
         WHEN: creating an Order with all fields
         THEN: the Order is created with correct values
         """
@@ -55,11 +148,12 @@ class TestOrderCreation:
         assert order.description == order_data["description"]
         assert order.slug == order_data["slug"]
         assert order.action_type == order_data["action_type"]
+        assert order.sensor == order_data["sensor"]
         assert order.is_enabled is True  # from ProtectedDisabledMixinModel
 
     def test_create_order_with_minimal_data(self, order_minimal_data):
         """
-        GIVEN: minimal data for an Order
+        GIVEN: minimal data for a getter Order
         WHEN: creating an Order with minimal data
         THEN: the Order is created with default values
         """
@@ -105,6 +199,9 @@ class TestOrderCreation:
         assert order.action_type == "set"
 
 
+# ─── TestOrderStringRepresentation ─────────────────────────────────────────────
+
+
 @pytest.mark.django_db
 class TestOrderStringRepresentation:
     """Tests for Order model string representation."""
@@ -143,11 +240,14 @@ class TestOrderStringRepresentation:
         assert result == expected
 
 
+# ─── TestOrderFields ────────────────────────────────────────────────────────────
+
+
 @pytest.mark.django_db
 class TestOrderFields:
     """Tests for Order model fields and constraints."""
 
-    def test_name_field(self, order_data):
+    def test_name_field(self, sensor):
         """
         GIVEN: a name for an Order
         WHEN: creating an Order with this name
@@ -160,12 +260,13 @@ class TestOrderFields:
         order = Order.objects.create(
             name=name,
             action_type="get",
+            sensor=sensor,
         )
 
         # THEN
         assert order.name == name
 
-    def test_description_field(self, order_data):
+    def test_description_field(self, sensor):
         """
         GIVEN: a description for an Order
         WHEN: creating an Order with this description
@@ -179,12 +280,13 @@ class TestOrderFields:
             name="Test Order",
             description=long_description,
             action_type="get",
+            sensor=sensor,
         )
 
         # THEN
         assert order.description == long_description
 
-    def test_slug_field(self, order_data):
+    def test_slug_field(self, sensor):
         """
         GIVEN: a valid slug
         WHEN: creating an Order with this slug
@@ -198,14 +300,15 @@ class TestOrderFields:
             name="Get Temperature Sensor External",
             slug=slug,
             action_type="get",
+            sensor=sensor,
         )
 
         # THEN
         assert order.slug == slug
 
-    def test_action_type_field_getter(self):
+    def test_action_type_field_getter(self, sensor):
         """
-        GIVEN: action_type='get'
+        GIVEN: action_type='get' and a sensor
         WHEN: creating an Order with getter action
         THEN: the action_type field is set to 'get'
         """
@@ -213,14 +316,15 @@ class TestOrderFields:
         order = Order.objects.create(
             name="Getter Order",
             action_type="get",
+            sensor=sensor,
         )
 
         # THEN
         assert order.action_type == "get"
 
-    def test_action_type_field_setter(self):
+    def test_action_type_field_setter(self, controller):
         """
-        GIVEN: action_type='set'
+        GIVEN: action_type='set' and a controller
         WHEN: creating an Order with setter action
         THEN: the action_type field is set to 'set'
         """
@@ -228,12 +332,13 @@ class TestOrderFields:
         order = Order.objects.create(
             name="Setter Order",
             action_type="set",
+            controller=controller,
         )
 
         # THEN
         assert order.action_type == "set"
 
-    def test_is_enabled_field_default_is_true(self):
+    def test_is_enabled_field_default_is_true(self, sensor):
         """
         GIVEN: data without specifying is_enabled field
         WHEN: creating an Order
@@ -243,10 +348,237 @@ class TestOrderFields:
         order = Order.objects.create(
             name="Test Order",
             action_type="get",
+            sensor=sensor,
         )
 
         # THEN
         assert order.is_enabled is True
+
+    def test_is_toggle_ctrl_value_default_is_false(self, controller):
+        """
+        GIVEN: data without specifying is_toggle_ctrl_value
+        WHEN: creating a setter Order
+        THEN: the is_toggle_ctrl_value field defaults to False
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Setter Order",
+            action_type="set",
+            controller=controller,
+        )
+
+        # THEN
+        assert order.is_toggle_ctrl_value is False
+
+    def test_is_toggle_ctrl_value_can_be_true(self, controller):
+        """
+        GIVEN: is_toggle_ctrl_value=True
+        WHEN: creating a setter Order
+        THEN: the is_toggle_ctrl_value field is set to True
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Toggle Order",
+            action_type="set",
+            controller=controller,
+            is_toggle_ctrl_value=True,
+        )
+
+        # THEN
+        assert order.is_toggle_ctrl_value is True
+
+    def test_ctrl_value_default_is_null(self, controller):
+        """
+        GIVEN: data without specifying ctrl_value
+        WHEN: creating a setter Order
+        THEN: the ctrl_value field defaults to None
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Setter Order",
+            action_type="set",
+            controller=controller,
+        )
+
+        # THEN
+        assert order.ctrl_value is None
+
+    def test_ctrl_value_can_be_set(self, controller):
+        """
+        GIVEN: ctrl_value='1'
+        WHEN: creating a setter Order with a ctrl_value
+        THEN: the ctrl_value field is set correctly
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Ctrl Order",
+            action_type="set",
+            controller=controller,
+            ctrl_value="1",
+        )
+
+        # THEN
+        assert order.ctrl_value == "1"
+
+    def test_ctrl_value_can_be_blank(self, controller):
+        """
+        GIVEN: ctrl_value=''
+        WHEN: creating a setter Order with an empty ctrl_value
+        THEN: the ctrl_value field stores an empty string
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Empty Ctrl Order",
+            action_type="set",
+            controller=controller,
+            ctrl_value="",
+        )
+
+        # THEN
+        assert order.ctrl_value == ""
+
+    def test_sensor_field_is_none_for_setter(self, controller):
+        """
+        GIVEN: a setter Order created without sensor
+        WHEN: reading the sensor field
+        THEN: the sensor field is None
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Setter No Sensor",
+            action_type="set",
+            controller=controller,
+        )
+
+        # THEN
+        assert order.sensor is None
+
+    def test_controller_field_is_none_for_getter_with_sensor_only(self, sensor):
+        """
+        GIVEN: a getter Order created with only a sensor
+        WHEN: reading the controller field
+        THEN: the controller field is None
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Getter No Controller",
+            action_type="get",
+            sensor=sensor,
+        )
+
+        # THEN
+        assert order.controller is None
+
+
+# ─── TestOrderConstraints ───────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestOrderConstraints:
+    """Tests for the check_order_action_type_sensor_controller constraint."""
+
+    def test_getter_without_sensor_and_controller_raises_integrity_error(self):
+        """
+        GIVEN: action_type='get' without sensor and without controller
+        WHEN: creating the Order
+        THEN: an IntegrityError is raised
+        """
+        # GIVEN / WHEN / THEN
+        with pytest.raises(IntegrityError):
+            Order.objects.create(name="Bad Getter", action_type="get")
+
+    def test_setter_without_controller_raises_integrity_error(self):
+        """
+        GIVEN: action_type='set' without controller
+        WHEN: creating the Order
+        THEN: an IntegrityError is raised
+        """
+        # GIVEN / WHEN / THEN
+        with pytest.raises(IntegrityError):
+            Order.objects.create(name="Bad Setter", action_type="set")
+
+    def test_setter_with_sensor_raises_integrity_error(self, sensor, controller):
+        """
+        GIVEN: action_type='set' with both a sensor and a controller
+        WHEN: creating the Order
+        THEN: an IntegrityError is raised (sensor must be null for setter)
+        """
+        # GIVEN / WHEN / THEN
+        with pytest.raises(IntegrityError):
+            Order.objects.create(
+                name="Setter With Sensor",
+                action_type="set",
+                sensor=sensor,
+                controller=controller,
+            )
+
+    def test_getter_with_sensor_only_is_valid(self, sensor):
+        """
+        GIVEN: action_type='get' with a sensor (no controller)
+        WHEN: creating the Order
+        THEN: the Order is created successfully
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Getter Sensor Only",
+            action_type="get",
+            sensor=sensor,
+        )
+
+        # THEN
+        assert order.pk is not None
+
+    def test_getter_with_controller_only_is_valid(self, controller):
+        """
+        GIVEN: action_type='get' with a controller (no sensor)
+        WHEN: creating the Order
+        THEN: the Order is created successfully
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Getter Controller Only",
+            action_type="get",
+            controller=controller,
+        )
+
+        # THEN
+        assert order.pk is not None
+
+    def test_getter_with_sensor_and_controller_is_valid(self, sensor, controller):
+        """
+        GIVEN: action_type='get' with both a sensor and a controller
+        WHEN: creating the Order
+        THEN: the Order is created successfully
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Getter Both",
+            action_type="get",
+            sensor=sensor,
+            controller=controller,
+        )
+
+        # THEN
+        assert order.pk is not None
+
+    def test_setter_with_controller_only_is_valid(self, controller):
+        """
+        GIVEN: action_type='set' with a controller (no sensor)
+        WHEN: creating the Order
+        THEN: the Order is created successfully
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Setter Controller Only",
+            action_type="set",
+            controller=controller,
+        )
+
+        # THEN
+        assert order.pk is not None
+
+
+# ─── TestOrderUpdate ────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -289,11 +621,11 @@ class TestOrderUpdate:
         updated_order = Order.objects.get(pk=order.pk)
         assert updated_order.description == new_description
 
-    def test_update_order_action_type(self, order_data):
+    def test_update_order_action_type_from_getter_to_setter(self, order_data, controller):
         """
-        GIVEN: an existing Order with action_type='get'
-        WHEN: updating its action_type to 'set'
-        THEN: the action_type is modified correctly
+        GIVEN: an existing getter Order
+        WHEN: updating its action_type to 'set', assigning a controller and removing the sensor
+        THEN: the action_type and related fields are updated correctly
         """
         # GIVEN
         order = Order.objects.create(**order_data)
@@ -301,11 +633,15 @@ class TestOrderUpdate:
 
         # WHEN
         order.action_type = "set"
+        order.sensor = None
+        order.controller = controller
         order.save()
 
         # THEN
         updated_order = Order.objects.get(pk=order.pk)
         assert updated_order.action_type == "set"
+        assert updated_order.sensor is None
+        assert updated_order.controller == controller
 
     def test_update_order_enabled_status(self, order_data):
         """
@@ -324,6 +660,45 @@ class TestOrderUpdate:
         # THEN
         updated_order = Order.objects.get(pk=order.pk)
         assert updated_order.is_enabled is False
+
+    def test_update_ctrl_value(self, order_setter_data):
+        """
+        GIVEN: an existing setter Order with ctrl_value=None
+        WHEN: updating its ctrl_value
+        THEN: the ctrl_value is modified correctly
+        """
+        # GIVEN
+        order = Order.objects.create(**order_setter_data)
+        assert order.ctrl_value is None
+
+        # WHEN
+        order.ctrl_value = "255"
+        order.save()
+
+        # THEN
+        updated_order = Order.objects.get(pk=order.pk)
+        assert updated_order.ctrl_value == "255"
+
+    def test_update_is_toggle_ctrl_value(self, order_setter_data):
+        """
+        GIVEN: an existing setter Order with is_toggle_ctrl_value=False
+        WHEN: updating its is_toggle_ctrl_value to True
+        THEN: the is_toggle_ctrl_value is modified correctly
+        """
+        # GIVEN
+        order = Order.objects.create(**order_setter_data)
+        assert order.is_toggle_ctrl_value is False
+
+        # WHEN
+        order.is_toggle_ctrl_value = True
+        order.save()
+
+        # THEN
+        updated_order = Order.objects.get(pk=order.pk)
+        assert updated_order.is_toggle_ctrl_value is True
+
+
+# ─── TestOrderDeletion ──────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -346,16 +721,16 @@ class TestOrderDeletion:
         # THEN
         assert not Order.objects.filter(pk=order_id).exists()
 
-    def test_delete_multiple_orders(self):
+    def test_delete_multiple_orders(self, sensor, controller):
         """
         GIVEN: multiple existing Orders
         WHEN: deleting all Orders
         THEN: no Orders exist in the database
         """
         # GIVEN
-        Order.objects.create(name="Order 1", action_type="get")
-        Order.objects.create(name="Order 2", action_type="set")
-        Order.objects.create(name="Order 3", action_type="get")
+        Order.objects.create(name="Order 1", action_type="get", sensor=sensor)
+        Order.objects.create(name="Order 2", action_type="set", controller=controller)
+        Order.objects.create(name="Order 3", action_type="get", controller=controller)
         assert Order.objects.count() == 3
 
         # WHEN
@@ -365,11 +740,14 @@ class TestOrderDeletion:
         assert Order.objects.count() == 0
 
 
+# ─── TestOrderManager ───────────────────────────────────────────────────────────
+
+
 @pytest.mark.django_db
 class TestOrderManager:
     """Tests for Order model custom manager (enabled)."""
 
-    def test_enabled_manager_returns_only_enabled_orders(self):
+    def test_enabled_manager_returns_only_enabled_orders(self, sensor, controller):
         """
         GIVEN: multiple Orders with different enabled statuses
         WHEN: querying with the enabled manager
@@ -380,16 +758,19 @@ class TestOrderManager:
             name="Enabled 1",
             action_type="get",
             is_enabled=True,
+            sensor=sensor,
         )
         enabled_order2 = Order.objects.create(
             name="Enabled 2",
             action_type="set",
             is_enabled=True,
+            controller=controller,
         )
         Order.objects.create(
             name="Disabled",
             action_type="get",
             is_enabled=False,
+            sensor=sensor,
         )
 
         # WHEN
@@ -399,6 +780,9 @@ class TestOrderManager:
         assert enabled_orders.count() == 2
         assert enabled_order1 in enabled_orders
         assert enabled_order2 in enabled_orders
+
+
+# ─── TestOrderPrepopulatedSlug ──────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -420,7 +804,7 @@ class TestOrderPrepopulatedSlug:
         # THEN
         assert result == order.name
 
-    def test_prepopulated_slug_with_different_names(self):
+    def test_prepopulated_slug_with_different_names(self, sensor):
         """
         GIVEN: multiple Orders with different names
         WHEN: calling prepopulated_slug on each
@@ -431,7 +815,7 @@ class TestOrderPrepopulatedSlug:
 
         for name in names:
             # WHEN
-            order = Order.objects.create(name=name, action_type="get")
+            order = Order.objects.create(name=name, action_type="get", sensor=sensor)
             result = order.prepopulated_slug()
 
             # THEN

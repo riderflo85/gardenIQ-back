@@ -23,10 +23,19 @@ class BaseSerializer(PKMixinSerializer):
         return obj
 
     def update(self, instance, validated_data: Dict):
+        # Manage ManyToMany fields separately
+        m2m_fields = [field.name for field in self.Meta.model._meta.many_to_many]
         for key, value in validated_data.items():
+            if key in m2m_fields:
+                continue  # Skip ManyToMany fields for now
             if hasattr(instance, key):
                 setattr(instance, key, value)
         instance.save()
+
+        for m2m_field in m2m_fields:
+            if m2m_field in validated_data:
+                getattr(instance, m2m_field).set(validated_data[m2m_field])
+
         return instance
 
 

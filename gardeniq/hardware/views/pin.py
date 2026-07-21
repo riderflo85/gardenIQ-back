@@ -41,18 +41,17 @@ class PinAPIModelView(BaseAPIModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+
         select_related_fields = []
-        if self.action == "list":
-            select_related_fields = [
-                "channel_choiced",
-            ]
+        prefetch_related_fields = []
+        if self.action in ("list", "retrieve"):
+            select_related_fields = ["channel_choiced"]
         if self.action == "retrieve":
-            select_related_fields = [
-                "channel_choiced",
-                "channels_available",
-                "device",
-                "device__status",
-            ]
+            select_related_fields += ["device", "device__status"]
+            prefetch_related_fields = ["channels_available"]
+
         if select_related_fields:
             qs = qs.select_related(*select_related_fields)
+        if prefetch_related_fields:
+            qs = qs.prefetch_related(*prefetch_related_fields)
         return qs

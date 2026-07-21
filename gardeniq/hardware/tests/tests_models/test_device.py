@@ -67,23 +67,23 @@ class TestDeviceModel:
 
     def test_check_update_detects_new_versions(self, device, mocker):
         # GIVEN
-        mocker.patch("gardeniq.hardware.models.garden_firmware_version", "2.0.0")
-        mocker.patch("gardeniq.hardware.models.micropython_version", "3.0.0")
+        mocker.patch("gardeniq.hardware.models.device.garden_firmware_version", "2.0.0")
+        mocker.patch("gardeniq.hardware.models.device.micropython_version", "3.0.0")
 
         # WHEN / THEN
         assert device._check_update() is True
 
     def test_check_update_returns_false_when_up_to_date(self, device, mocker):
         # GIVEN
-        mocker.patch("gardeniq.hardware.models.garden_firmware_version", device.gd_firmware_version)
-        mocker.patch("gardeniq.hardware.models.micropython_version", device.mp_firmware_version)
+        mocker.patch("gardeniq.hardware.models.device.garden_firmware_version", device.gd_firmware_version)
+        mocker.patch("gardeniq.hardware.models.device.micropython_version", device.mp_firmware_version)
 
         # WHEN / THEN
         assert device._check_update() is False
 
     def test_check_update_handles_version_errors(self, device, mocker):
         # GIVEN
-        mocker.patch("gardeniq.hardware.models.Version", side_effect=ValueError("boom"))
+        mocker.patch("gardeniq.hardware.models.device.Version", side_effect=ValueError("boom"))
 
         # WHEN / THEN
         assert device._check_update() is False

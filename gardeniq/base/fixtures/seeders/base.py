@@ -16,7 +16,7 @@ class BaseSeeder:
     filename: str
     root_dir_source: Path
     # It's use to search object in database for update it
-    search_field_name: List[str]
+    search_field_name: List[str] = ["seed_id"]
 
     source_file: Path
     dependencies = []

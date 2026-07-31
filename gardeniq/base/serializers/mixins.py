@@ -43,3 +43,16 @@ class AutocompleteSlugMixinSerializer(serializers.Serializer):
 
 class EnabledMixinSerializer(serializers.Serializer):
     is_enabled = serializers.BooleanField(default=True)
+
+
+class SeederMixinSerializer(serializers.Serializer):
+    """A mixin serializer for adding seeders fields to any object inheriting from SeederMixinModel."""
+
+    seed_id = serializers.BigIntegerField(min_value=1)
+    is_ready = serializers.BooleanField(default=True)
+
+
+class SeederIsReadyMixinSerializer(serializers.Serializer):
+    """A mixin serializer for adding is_ready field to any object inheriting from SeederMixinModel."""
+
+    is_ready = serializers.BooleanField(default=True)

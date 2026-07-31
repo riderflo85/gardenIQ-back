@@ -2,6 +2,7 @@ import pytest
 
 from gardeniq.base.models import Status
 from gardeniq.base.serializers import StatusReadOnlySerializer
+from gardeniq.base.serializers import StatusSeederSerializer
 from gardeniq.base.serializers import StatusSerializer
 
 
@@ -271,6 +272,7 @@ class TestStatusReadOnlySerializer:
             "description": "Task currently running",
             "tag": "in-progress",
             "color": "#FF5733",
+            "is_ready": True,
         }
 
         # WHEN
@@ -293,6 +295,7 @@ class TestStatusReadOnlySerializer:
             "description": "",
             "tag": "pending",
             "color": "#FFA500",
+            "is_ready": True,
         }
 
         # WHEN
@@ -300,3 +303,122 @@ class TestStatusReadOnlySerializer:
 
         # THEN
         assert ser.data == expected
+
+
+@pytest.mark.django_db
+class TestStatusSeederSerializer:
+
+    def test_valid_serializer(self):
+        # GIVEN
+        data = {
+            "name": "In Progress",
+            "description": "Task currently running",
+            "tag": "in-progress",
+            "color": "#FF5733",
+            "seed_id": 1,
+            "is_ready": True,
+        }
+
+        # WHEN
+        ser = StatusSeederSerializer(data=data)
+
+        # THEN
+        assert ser.is_valid()
+
+    def test_valid_serializer_without_is_ready_defaults_to_true(self):
+        # GIVEN
+        data = {
+            "name": "Pending",
+            "tag": "pending",
+            "seed_id": 2,
+        }
+
+        # WHEN
+        ser = StatusSeederSerializer(data=data)
+
+        # THEN
+        assert ser.is_valid()
+        assert ser.data["is_ready"] is True
+
+    def test_create_status_with_seeder_fields(self):
+        # GIVEN
+        data = {
+            "name": "In Progress",
+            "tag": "in-progress",
+            "color": "#FF5733",
+            "seed_id": 10,
+            "is_ready": False,
+        }
+
+        # WHEN
+        ser = StatusSeederSerializer(data=data)
+        assert ser.is_valid()
+        status = ser.save()
+
+        # THEN
+        assert isinstance(status, Status)
+        assert status.seed_id == 10
+        assert status.is_ready is False
+
+    def test_update_status_with_seeder_fields(self):
+        # GIVEN
+        status = Status.objects.create(name="Old", tag="old", seed_id=5)
+        updated_data = {
+            "name": "Updated",
+            "tag": "updated",
+            "seed_id": 5,
+            "is_ready": False,
+        }
+
+        # WHEN
+        ser = StatusSeederSerializer(instance=status, data=updated_data)
+        assert ser.is_valid()
+        updated_status = ser.save()
+
+        # THEN
+        assert updated_status.seed_id == 5
+        assert updated_status.is_ready is False
+
+    def test_errors_missing_seed_id(self):
+        # GIVEN
+        data = {
+            "name": "Test",
+            "tag": "test",
+        }
+
+        # WHEN
+        ser = StatusSeederSerializer(data=data)
+
+        # THEN
+        assert not ser.is_valid()
+        assert "seed_id" in ser.errors
+
+    def test_errors_seed_id_zero(self):
+        # GIVEN
+        data = {
+            "name": "Test",
+            "tag": "test",
+            "seed_id": 0,
+        }
+
+        # WHEN
+        ser = StatusSeederSerializer(data=data)
+
+        # THEN
+        assert not ser.is_valid()
+        assert "seed_id" in ser.errors
+
+    def test_errors_seed_id_negative(self):
+        # GIVEN
+        data = {
+            "name": "Test",
+            "tag": "test",
+            "seed_id": -1,
+        }
+
+        # WHEN
+        ser = StatusSeederSerializer(data=data)
+
+        # THEN
+        assert not ser.is_valid()
+        assert "seed_id" in ser.errors

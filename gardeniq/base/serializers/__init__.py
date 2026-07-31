@@ -6,6 +6,9 @@ from .mixins import DescriptionMixinSerializer
 from .mixins import EnabledMixinSerializer
 from .mixins import NameMixinSerializer
 from .mixins import OptionalDescriptionMixinSerializer
+from .mixins import SeederIsReadyMixinSerializer
+from .mixins import SeederMixinSerializer
 from .mixins import SimpleSlugMixinSerializer
 from .status import StatusReadOnlySerializer
+from .status import StatusSeederSerializer
 from .status import StatusSerializer

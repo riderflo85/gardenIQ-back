@@ -1,5 +1,5 @@
 from gardeniq.orderlg.models import Order
-from gardeniq.orderlg.serializers import OrderSerializer
+from gardeniq.orderlg.serializers import OrderSeederSerializer
 
 from .orderlg import OrderlgSeeder
 
@@ -7,5 +7,5 @@ from .orderlg import OrderlgSeeder
 class OrderSeeder(OrderlgSeeder):
     filename = "orders.json"
     model = Order
-    serializer = OrderSerializer
-    search_field_name = ["slug"]
+    serializer = OrderSeederSerializer
+    search_field_name = OrderlgSeeder.search_field_name + ["slug"]

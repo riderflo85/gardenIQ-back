@@ -469,6 +469,72 @@ class TestOrderFields:
         # THEN
         assert order.controller is None
 
+    def test_seed_id_field_default_is_null(self, sensor):
+        """
+        GIVEN: data without specifying seed_id field
+        WHEN: creating an Order
+        THEN: the seed_id field defaults to None
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Test Order",
+            action_type="get",
+            sensor=sensor,
+        )
+
+        # THEN
+        assert order.seed_id is None
+
+    def test_seed_id_can_be_set(self, sensor):
+        """
+        GIVEN: a seed_id value
+        WHEN: creating an Order with this seed_id
+        THEN: the seed_id field is set correctly
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Seeder Order",
+            action_type="get",
+            sensor=sensor,
+            seed_id=42,
+        )
+
+        # THEN
+        assert order.seed_id == 42
+
+    def test_is_ready_field_default_is_true(self, sensor):
+        """
+        GIVEN: data without specifying is_ready field
+        WHEN: creating an Order
+        THEN: the is_ready field defaults to True
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Test Order",
+            action_type="get",
+            sensor=sensor,
+        )
+
+        # THEN
+        assert order.is_ready is True
+
+    def test_is_ready_can_be_false(self):
+        """
+        GIVEN: is_ready=False with a valid seed_id (seeder template)
+        WHEN: creating an Order without sensor or controller
+        THEN: the is_ready field is set to False
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Seeder Template",
+            action_type="get",
+            seed_id=1,
+            is_ready=False,
+        )
+
+        # THEN
+        assert order.is_ready is False
+
 
 # ─── TestOrderConstraints ───────────────────────────────────────────────────────
 
@@ -576,6 +642,38 @@ class TestOrderConstraints:
 
         # THEN
         assert order.pk is not None
+
+    def test_seeder_order_without_sensor_and_controller_is_valid(self):
+        """
+        GIVEN: seed_id > 0 and is_ready=False, without sensor or controller
+        WHEN: creating the Order
+        THEN: the Order is created successfully (seeder template case)
+        """
+        # GIVEN / WHEN
+        order = Order.objects.create(
+            name="Seeder Template",
+            action_type="get",
+            seed_id=99,
+            is_ready=False,
+        )
+
+        # THEN
+        assert order.pk is not None
+
+    def test_seeder_order_with_is_ready_true_raises_integrity_error(self):
+        """
+        GIVEN: seed_id > 0 but is_ready=True (default), without sensor or controller
+        WHEN: creating the Order
+        THEN: an IntegrityError is raised (is_ready must be False for seeder template)
+        """
+        # GIVEN / WHEN / THEN
+        with pytest.raises(IntegrityError):
+            Order.objects.create(
+                name="Bad Seeder",
+                action_type="get",
+                seed_id=99,
+                is_ready=True,
+            )
 
 
 # ─── TestOrderUpdate ────────────────────────────────────────────────────────────

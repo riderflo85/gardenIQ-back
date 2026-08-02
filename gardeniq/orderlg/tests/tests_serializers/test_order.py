@@ -13,6 +13,7 @@ from gardeniq.hardware.serializers import SensorListReadOnlySerializer
 from gardeniq.orderlg.models import Order
 from gardeniq.orderlg.serializers import OrderDetailReadOnlySerializer
 from gardeniq.orderlg.serializers import OrderListReadOnlySerializer
+from gardeniq.orderlg.serializers import OrderSeederSerializer
 from gardeniq.orderlg.serializers import OrderSerializer
 
 # ─── Hardware Fixtures ──────────────────────────────────────────────────────────
@@ -120,12 +121,14 @@ class TestOrderSerializer:
         # Fields with allow_null=True (controller, ctrl_value) appear as None
         # even when not provided. Fields without allow_null (is_toggle_ctrl_value)
         # are absent from the output when not provided.
+        # is_ready is read_only with default=True, so it appears in the output.
         expected = {
             "name": "Test Order",
             "description": "Test Order Description",
             "slug": "test-order",
             "action_type": "get",
             "is_enabled": True,
+            "is_ready": True,
             "sensor": sensor.pk,
             "controller": None,
             "ctrl_value": None,
@@ -410,6 +413,7 @@ class TestOrderListReadOnlySerializer:
             "slug": order.slug,
             "action_type": order.action_type,
             "is_enabled": order.is_enabled,
+            "is_ready": order.is_ready,
             "sensor": sensor.name,
         }
 
@@ -437,6 +441,7 @@ class TestOrderListReadOnlySerializer:
             "slug": order.slug,
             "action_type": order.action_type,
             "is_enabled": order.is_enabled,
+            "is_ready": order.is_ready,
             "controller": controller.name,
         }
 
@@ -468,6 +473,7 @@ class TestOrderListReadOnlySerializer:
                 "slug": order1.slug,
                 "action_type": order1.action_type,
                 "is_enabled": order1.is_enabled,
+                "is_ready": order1.is_ready,
                 "sensor": sensor.name,
             },
             {
@@ -476,6 +482,7 @@ class TestOrderListReadOnlySerializer:
                 "slug": order2.slug,
                 "action_type": order2.action_type,
                 "is_enabled": order2.is_enabled,
+                "is_ready": order2.is_ready,
                 "controller": controller.name,
             },
         ]
@@ -543,6 +550,7 @@ class TestOrderDetailReadOnlySerializer:
             "slug": order.slug,
             "action_type": order.action_type,
             "is_enabled": order.is_enabled,
+            "is_ready": order.is_ready,
             "sensor": SensorListReadOnlySerializer(instance=sensor).data,
             "controller": None,
             "is_toggle_ctrl_value": order.is_toggle_ctrl_value,
@@ -576,6 +584,7 @@ class TestOrderDetailReadOnlySerializer:
             "slug": order.slug,
             "action_type": order.action_type,
             "is_enabled": order.is_enabled,
+            "is_ready": order.is_ready,
             "sensor": None,
             "controller": ControllerListReadOnlySerializer(instance=controller).data,
             "is_toggle_ctrl_value": order.is_toggle_ctrl_value,
@@ -631,3 +640,208 @@ class TestOrderDetailReadOnlySerializer:
         # THEN
         assert serializer.data["ctrl_value"] == "128"
         assert serializer.data["is_toggle_ctrl_value"] is False
+
+
+# ─── TestOrderSeederSerializer ──────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestOrderSeederSerializer:
+    """Tests for OrderSeederSerializer."""
+
+    def test_valid_seeder_serializer(self):
+        """
+        GIVEN: valid seeder data with seed_id > 0, is_ready=False, no sensor or controller
+        WHEN: validating the OrderSeederSerializer
+        THEN: validation passes
+        """
+        # GIVEN
+        data = {
+            "name": "Seeder Template",
+            "description": "Template description",
+            "action_type": "get",
+            "seed_id": 1,
+            "is_ready": False,
+        }
+
+        # WHEN
+        serializer = OrderSeederSerializer(data=data)
+
+        # THEN
+        assert serializer.is_valid(), serializer.errors
+
+    def test_create_seeder_order(self):
+        """
+        GIVEN: valid seeder data
+        WHEN: creating an Order via OrderSeederSerializer
+        THEN: the Order is created with seed_id, is_ready=False, and no sensor or controller
+        """
+        # GIVEN
+        data = {
+            "name": "Seeder Template",
+            "description": "Template description",
+            "action_type": "get",
+            "seed_id": 1,
+            "is_ready": False,
+        }
+
+        # WHEN
+        serializer = OrderSeederSerializer(data=data)
+        assert serializer.is_valid(), serializer.errors
+        order = serializer.save()
+
+        # THEN
+        assert isinstance(order, Order)
+        assert order.seed_id == 1
+        assert order.is_ready is False
+        assert order.sensor is None
+        assert order.controller is None
+        assert order.name == data["name"]
+        assert order.slug == "seeder-template"
+
+    def test_create_seeder_order_with_custom_slug(self):
+        """
+        GIVEN: valid seeder data with a custom slug
+        WHEN: creating an Order via OrderSeederSerializer
+        THEN: the custom slug is used
+        """
+        # GIVEN
+        data = {
+            "name": "Seeder Template",
+            "description": "Template description",
+            "action_type": "get",
+            "seed_id": 1,
+            "is_ready": False,
+            "slug": "my-custom-seeder-slug",
+        }
+
+        # WHEN
+        serializer = OrderSeederSerializer(data=data)
+        assert serializer.is_valid(), serializer.errors
+        order = serializer.save()
+
+        # THEN
+        assert order.slug == "my-custom-seeder-slug"
+
+    def test_validation_error_missing_seed_id(self):
+        """
+        GIVEN: seeder data without seed_id
+        WHEN: validating the OrderSeederSerializer
+        THEN: validation fails on the seed_id field
+        """
+        # GIVEN
+        data = {
+            "name": "Seeder Template",
+            "description": "Template description",
+            "action_type": "get",
+            "is_ready": False,
+        }
+
+        # WHEN
+        serializer = OrderSeederSerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert "seed_id" in serializer.errors
+
+    def test_validation_error_is_ready_true(self):
+        """
+        GIVEN: seeder data with is_ready=True
+        WHEN: validating the OrderSeederSerializer
+        THEN: validation fails (seeder template must have is_ready=False)
+        """
+        # GIVEN
+        data = {
+            "name": "Seeder Template",
+            "description": "Template description",
+            "action_type": "get",
+            "seed_id": 1,
+            "is_ready": True,
+        }
+
+        # WHEN
+        serializer = OrderSeederSerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert "non_field_errors" in serializer.errors
+
+    def test_validation_error_with_sensor(self, sensor):
+        """
+        GIVEN: seeder data with a sensor
+        WHEN: validating the OrderSeederSerializer
+        THEN: validation fails (seeder template must not have a sensor)
+        """
+        # GIVEN
+        data = {
+            "name": "Seeder Template",
+            "description": "Template description",
+            "action_type": "get",
+            "seed_id": 1,
+            "is_ready": False,
+            "sensor": sensor.pk,
+        }
+
+        # WHEN
+        serializer = OrderSeederSerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert "non_field_errors" in serializer.errors
+
+    def test_validation_error_with_controller(self, controller):
+        """
+        GIVEN: seeder data with a controller
+        WHEN: validating the OrderSeederSerializer
+        THEN: validation fails (seeder template must not have a controller)
+        """
+        # GIVEN
+        data = {
+            "name": "Seeder Template",
+            "description": "Template description",
+            "action_type": "set",
+            "seed_id": 1,
+            "is_ready": False,
+            "controller": controller.pk,
+        }
+
+        # WHEN
+        serializer = OrderSeederSerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert "non_field_errors" in serializer.errors
+
+    def test_update_seeder_order(self):
+        """
+        GIVEN: an existing seeder Order
+        WHEN: updating it via OrderSeederSerializer
+        THEN: the Order is updated with the new values
+        """
+        # GIVEN
+        order = Order.objects.create(
+            name="Old Seeder Template",
+            description="Old description",
+            action_type="get",
+            seed_id=5,
+            is_ready=False,
+        )
+        updated_data = {
+            "name": "Updated Seeder Template",
+            "description": "Updated description",
+            "action_type": "get",
+            "seed_id": 5,
+            "is_ready": False,
+        }
+
+        # WHEN
+        serializer = OrderSeederSerializer(instance=order, data=updated_data)
+        assert serializer.is_valid(), serializer.errors
+        updated_order = serializer.save()
+
+        # THEN
+        assert updated_order.name == updated_data["name"]
+        assert updated_order.description == updated_data["description"]
+        assert updated_order.slug == "updated-seeder-template"
+        assert updated_order.seed_id == 5
+        assert updated_order.is_ready is False

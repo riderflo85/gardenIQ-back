@@ -79,6 +79,7 @@ class OrderListReadOnlySerializer(
     NameMixinSerializer,
     SimpleSlugMixinSerializer,
     EnabledMixinSerializer,
+    SeederIsReadyMixinSerializer,
 ):
     action_type = serializers.CharField(read_only=True)
     sensor = serializers.CharField(read_only=True, source="sensor.name")

@@ -447,6 +447,7 @@ class TestPinDetailReadOnlySerializer:
                 "description": device_status.description,
                 "tag": device_status.tag,
                 "color": device_status.color,
+                "is_ready": True,
             },
         }
 

@@ -1,3 +1,5 @@
+from django.db import IntegrityError
+
 import pytest
 
 from gardeniq.base.models.status import Status
@@ -249,3 +251,77 @@ class TestStatusDeletion:
 
         # THEN
         assert not Status.objects.filter(pk=status_id).exists()
+
+
+@pytest.mark.django_db
+class TestStatusSeederMixinFields:
+    """Tests for fields inherited from SeederMixinModel."""
+
+    def test_seed_id_defaults_to_none(self, status_data):
+        """
+        GIVEN: data without seed_id
+        WHEN: creating a Status without specifying a seed_id
+        THEN: seed_id is None
+        """
+        # GIVEN / WHEN
+        status = Status.objects.create(**status_data)
+
+        # THEN
+        assert status.seed_id is None
+
+    def test_is_ready_defaults_to_true(self, status_data):
+        """
+        GIVEN: data without is_ready
+        WHEN: creating a Status without specifying is_ready
+        THEN: is_ready is True
+        """
+        # GIVEN / WHEN
+        status = Status.objects.create(**status_data)
+
+        # THEN
+        assert status.is_ready is True
+
+    def test_create_status_with_seed_id(self, status_data):
+        """
+        GIVEN: data with a seed_id
+        WHEN: creating a Status with a seed_id
+        THEN: the Status is created with the correct seed_id
+        """
+        # GIVEN
+        status_data["seed_id"] = 42
+
+        # WHEN
+        status = Status.objects.create(**status_data)
+
+        # THEN
+        assert status.seed_id == 42
+
+    def test_seed_id_is_unique(self, status_data):
+        """
+        GIVEN: an existing Status with a seed_id
+        WHEN: creating another Status with the same seed_id
+        THEN: an integrity error is raised
+        """
+        # GIVEN
+        Status.objects.create(**status_data, seed_id=99)
+
+        # WHEN / THEN
+        with pytest.raises(IntegrityError):
+            Status.objects.create(name="Other", tag="other", seed_id=99)
+
+    def test_is_ready_can_be_set_to_false(self, status_data):
+        """
+        GIVEN: an existing Status
+        WHEN: setting is_ready to False
+        THEN: is_ready is False
+        """
+        # GIVEN
+        status = Status.objects.create(**status_data)
+
+        # WHEN
+        status.is_ready = False
+        status.save()
+
+        # THEN
+        updated_status = Status.objects.get(pk=status.pk)
+        assert updated_status.is_ready is False

@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from gardeniq.base.admin import seeder_fields_name
 from gardeniq.orderlg.models import Order
 
 
@@ -7,7 +8,7 @@ from gardeniq.orderlg.models import Order
 class OrderAdmin(admin.ModelAdmin):
     """Admin interface for the Order model."""
 
-    list_display = (
+    list_display = seeder_fields_name + (
         "id",
         "name",
         "slug",
@@ -15,9 +16,9 @@ class OrderAdmin(admin.ModelAdmin):
         "is_enabled",
     )
     search_fields = ("name", "slug", "action_type")
-    list_filter = ("action_type", "is_enabled")
+    list_filter = seeder_fields_name + ("action_type", "is_enabled")
     # For ordering fields in admin create and update forms.
-    fields = (
+    fields = seeder_fields_name + (
         "name",
         "slug",
         "description",

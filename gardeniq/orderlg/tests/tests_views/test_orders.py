@@ -125,6 +125,7 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         assert "slug" in first_order
         assert "action_type" in first_order
         assert "is_enabled" in first_order
+        assert "is_ready" in first_order
 
     def test_retrieve(self, authenticated_client, obj):
         """
@@ -150,6 +151,7 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         assert response.data["controller"] is None
         assert "is_toggle_ctrl_value" in response.data
         assert "ctrl_value" in response.data
+        assert response.data["is_ready"] is True
 
     def test_retrieve_setter_order(self, authenticated_client, obj):
         """
@@ -172,6 +174,7 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         assert "name" in response.data["controller"]
         assert "is_toggle_ctrl_value" in response.data
         assert "ctrl_value" in response.data
+        assert response.data["is_ready"] is True
 
     def test_create(self, authenticated_client, sensor):
         """
@@ -198,6 +201,7 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         assert response.data["action_type"] == payload["action_type"]
         assert response.data["sensor"] == sensor.pk
         assert response.data["controller"] is None
+        assert response.data["is_ready"] is True
         assert Order.objects.filter(name=payload["name"]).exists()
 
     def test_create_setter_order(self, authenticated_client, controller):
@@ -225,6 +229,7 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         assert response.data["controller"] == controller.pk
         assert response.data["sensor"] is None
         assert response.data["ctrl_value"] == "1"
+        assert response.data["is_ready"] is True
         assert Order.objects.filter(name=payload["name"]).exists()
 
     def test_create_with_invalid_constraint_getter_no_sensor_controller(self, authenticated_client):
@@ -294,6 +299,7 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
         assert response.data["action_type"] == update_data["action_type"]
         assert response.data["controller"] == controller.pk
         assert response.data["sensor"] is None
+        assert response.data["is_ready"] is True
 
         order1.refresh_from_db()
         assert order1.name == update_data["name"]

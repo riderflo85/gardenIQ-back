@@ -38,6 +38,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         assert res_data["tag"] == expected["tag"]
         assert res_data["color"] == expected["color"]
         assert res_data["description"] == expected["description"]
+        assert res_data["is_ready"] is True
 
     def test_retrieve_status(self, authenticated_client, obj):
         """Test retrieving a specific status"""
@@ -56,6 +57,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
         assert response.data["tag"] == expected["tag"]
         assert response.data["color"] == expected["color"]
         assert response.data["description"] == expected["description"]
+        assert response.data["is_ready"] is True
 
     def test_create_status(self, authenticated_client):
         """Test creating a new status"""

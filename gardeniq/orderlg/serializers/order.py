@@ -6,6 +6,8 @@ from gardeniq.base.serializers import DescriptionMixinSerializer
 from gardeniq.base.serializers import EnabledMixinSerializer
 from gardeniq.base.serializers import NameMixinSerializer
 from gardeniq.base.serializers import ReadOnlySerializer
+from gardeniq.base.serializers import SeederIsReadyMixinSerializer
+from gardeniq.base.serializers import SeederMixinSerializer
 from gardeniq.base.serializers import SimpleSlugMixinSerializer
 from gardeniq.base.serializers.mixins import PKMixinSerializer
 from gardeniq.hardware.models import Controller
@@ -21,6 +23,7 @@ class OrderSerializer(
     DescriptionMixinSerializer,
     AutocompleteSlugMixinSerializer,
     EnabledMixinSerializer,
+    SeederIsReadyMixinSerializer,
 ):
     action_type = serializers.ChoiceField(choices=Order.ACTIONS_CHOICES)
     sensor = serializers.PrimaryKeyRelatedField(
@@ -39,6 +42,8 @@ class OrderSerializer(
         allow_blank=True,
         allow_null=True,
     )
+    # Override is_ready field to be read-only and default to True
+    is_ready = serializers.BooleanField(read_only=True, default=True)
 
     class Meta(BaseSerializer.Meta, AutocompleteSlugMixinSerializer.Meta):
         model = Order
@@ -61,6 +66,10 @@ class OrderSerializer(
                 "if action_type='set' then controller must be set and sensor must be empty."
             )
 
+        # `is_ready` can be False if the user updates an Order that was created by the Seeder.
+        if attrs.get("is_ready") is False:
+            attrs["is_ready"] = True  # Override is_ready to True if False is provided
+
         return attrs
 
 
@@ -70,6 +79,7 @@ class OrderListReadOnlySerializer(
     NameMixinSerializer,
     SimpleSlugMixinSerializer,
     EnabledMixinSerializer,
+    SeederIsReadyMixinSerializer,
 ):
     action_type = serializers.CharField(read_only=True)
     sensor = serializers.CharField(read_only=True, source="sensor.name")
@@ -85,3 +95,25 @@ class OrderDetailReadOnlySerializer(OrderListReadOnlySerializer, DescriptionMixi
         allow_blank=True,
         allow_null=True,
     )
+
+
+class OrderSeederSerializer(SeederMixinSerializer, OrderSerializer):
+    is_ready = serializers.BooleanField(default=True)
+
+    def validate(self, attrs):
+        # Bypass the action_type, sensor, and controller validation in OrderSerializer.
+        attrs = AutocompleteSlugMixinSerializer.validate(self, attrs)
+
+        seed_id = attrs.get("seed_id", getattr(self.instance, "seed_id", None))
+        is_ready = attrs.get("is_ready", getattr(self.instance, "is_ready", None))
+        controller = attrs.get("controller", getattr(self.instance, "controller", None))
+        sensor = attrs.get("sensor", getattr(self.instance, "sensor", None))
+
+        if seed_id is not None and seed_id > 0 and is_ready is False and controller is None and sensor is None:
+            return attrs
+        else:
+            raise serializers.ValidationError(
+                "Invalid constraint: "
+                "if seed_id is set and greater than 0, is_ready must be False, "
+                "and both controller and sensor must be None."
+            )

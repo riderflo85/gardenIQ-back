@@ -7,12 +7,14 @@ from gardeniq.base.models import DescriptionMixinModel
 from gardeniq.base.models import NameMixinModel
 from gardeniq.base.models import ProtectedDeletedMixinModel
 from gardeniq.base.models import ProtectedDisabledMixinModel
+from gardeniq.base.models import SeederMixinModel
 from gardeniq.base.models import SlugMixinModel
 from gardeniq.hardware.models import Controller
 from gardeniq.hardware.models import Sensor
 
 
 class Order(
+    SeederMixinModel,
     DescriptionMixinModel,
     NameMixinModel,
     SlugMixinModel,
@@ -21,10 +23,12 @@ class Order(
 ):
     """
     Inherited fields:
+      - `seed_id`
+      - `is_ready`
       - `description`
       - `name`
       - `slug`
-      - `is_enable`
+      - `is_enabled`
     """
 
     ACTIONS_CHOICES = (
@@ -70,8 +74,16 @@ class Order(
         verbose_name_plural = "orders"
         constraints = [
             models.CheckConstraint(
-                condition=(Q(action_type="get") & (Q(sensor__isnull=False) | Q(controller__isnull=False)))
-                | (Q(action_type="set") & Q(controller__isnull=False) & Q(sensor__isnull=True)),
+                condition=(
+                    (
+                        (Q(seed_id__isnull=False) & Q(seed_id__gt=0))
+                        & Q(is_ready=False)
+                        & Q(controller__isnull=True)
+                        & Q(sensor__isnull=True)
+                    )
+                    | (Q(action_type="get") & (Q(sensor__isnull=False) | Q(controller__isnull=False)))
+                    | (Q(action_type="set") & Q(controller__isnull=False) & Q(sensor__isnull=True))
+                ),
                 name="check_order_action_type_sensor_controller",
             )
         ]

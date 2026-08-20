@@ -9,7 +9,9 @@ from gardeniq.base.serializers import BaseSerializer
 from gardeniq.base.serializers import NameMixinSerializer
 from gardeniq.base.serializers import OptionalDescriptionMixinSerializer
 from gardeniq.base.serializers import ReadOnlySerializer
+from gardeniq.base.serializers import StatusReadOnlySerializer
 from gardeniq.base.serializers import StatusSerializer
+from gardeniq.base.serializers.mixins import PKMixinSerializer
 from gardeniq.hardware.models import Device
 from gardeniq.hardware.utils import list_connected_devices
 
@@ -38,3 +40,7 @@ class DeviceSerializer(BaseSerializer, NameMixinSerializer, OptionalDescriptionM
 
 class DeviceDetailReadOnlySerializer(ReadOnlySerializer, DeviceSerializer):
     status = StatusSerializer(many=False, read_only=True)
+
+
+class DeviceMinimalReadOnlySerializer(ReadOnlySerializer, PKMixinSerializer, NameMixinSerializer):
+    status = StatusReadOnlySerializer()

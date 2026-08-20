@@ -144,3 +144,26 @@ class ProtectedDeletedMixinModel(ProtectedRelationsMixinModel):
             raise DeleteProtectedException()
 
         super().delete(*args, **kwargs)
+
+
+class SeederMixinModel(models.Model):
+    """
+    Mixin to add a ``seed_id`` and ``is_ready`` fields to a model.
+    These fields are used to mark objects that have been created by a seeder.
+    """
+
+    seed_id = models.PositiveBigIntegerField(
+        null=True,
+        blank=True,
+        unique=True,
+        verbose_name="seed id",
+        help_text="The id of the seeder that created this object.",
+    )
+    is_ready = models.BooleanField(
+        default=True,
+        verbose_name="is ready",
+        help_text="Designate whether this object is ready to be used.",
+    )
+
+    class Meta:
+        abstract = True

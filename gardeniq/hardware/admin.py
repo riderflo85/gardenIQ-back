@@ -5,11 +5,16 @@ from django.contrib import admin
 from django.forms import TypedChoiceField
 from django.http import HttpRequest
 
+from gardeniq.hardware.models import Channel
+from gardeniq.hardware.models import Controller
+from gardeniq.hardware.models import ControllerCategory
 from gardeniq.hardware.models import Device
+from gardeniq.hardware.models import Pin
+from gardeniq.hardware.models import Sensor
+from gardeniq.hardware.models import SensorCategory
 from gardeniq.hardware.utils import list_connected_devices
 
 
-# Register your models here.
 @admin.register(Device)
 class DeviceAdmin(admin.ModelAdmin):
     """Admin interface for the Device model."""
@@ -64,3 +69,54 @@ class DeviceAdmin(admin.ModelAdmin):
         form = super().get_form(request, obj, **kwargs)
         form.base_fields["path"] = TypedChoiceField(choices=self._get_serial_port_choices(), coerce=str)  # type: ignore
         return form
+
+
+@admin.register(Channel)
+class ChannelAdmin(admin.ModelAdmin):
+    """Admin interface for the Channel model."""
+
+    list_display = ("id", "name", "description")
+    search_fields = ("name",)
+
+
+@admin.register(Pin)
+class PinAdmin(admin.ModelAdmin):
+    """Admin interface for the Pin model."""
+
+    list_display = ("id", "pin_number", "channel_choiced", "device")
+    search_fields = ("pin_number",)
+    list_filter = ("channel_choiced", "device")
+
+
+@admin.register(ControllerCategory)
+class ControllerCategoryAdmin(admin.ModelAdmin):
+    """Admin interface for the ControllerCategory model."""
+
+    list_display = ("id", "name")
+    search_fields = ("name",)
+
+
+@admin.register(SensorCategory)
+class SensorCategoryAdmin(admin.ModelAdmin):
+    """Admin interface for the SensorCategory model."""
+
+    list_display = ("id", "name", "unity_value")
+    search_fields = ("name",)
+
+
+@admin.register(Sensor)
+class SensorAdmin(admin.ModelAdmin):
+    """Admin interface for the Sensor model."""
+
+    list_display = ("id", "name", "category", "device", "pin")
+    search_fields = ("name",)
+    list_filter = ("category", "device")
+
+
+@admin.register(Controller)
+class ControllerAdmin(admin.ModelAdmin):
+    """Admin interface for the Controller model."""
+
+    list_display = ("id", "name", "category", "device", "pin")
+    search_fields = ("name",)
+    list_filter = ("category", "device")

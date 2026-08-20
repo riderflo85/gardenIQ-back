@@ -11,5 +11,6 @@ class DeviceAPIModelView(BaseAPIModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        qs = qs.select_related("status")
+        if self.action == "retrieve":
+            qs = qs.select_related("status")
         return qs

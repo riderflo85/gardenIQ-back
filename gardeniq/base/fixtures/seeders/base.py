@@ -16,10 +16,11 @@ class BaseSeeder:
     filename: str
     root_dir_source: Path
     # It's use to search object in database for update it
-    search_field_name: List[str]
+    search_field_name: List[str] = ["seed_id"]
 
     source_file: Path
     dependencies = []
+    related_fields_name: Dict[str, List[str]] = {"FK": [], "M2M": []}
 
     def __init__(
         self, success_logger: Callable[[object], str | Any], error_logger: Callable[[object], str | Any]
@@ -56,6 +57,46 @@ class BaseSeeder:
             self.filename,
         )
 
+        self._get_related_fields()
+
+    def _get_related_fields(self) -> None:
+        """Populate the `related_fields_name` attribute with the related fields names of the model."""
+        for field in self.model._meta.get_fields():
+            if field.is_relation:
+                if field.many_to_many:
+                    self.related_fields_name["M2M"].append(field.name)
+                elif field.one_to_many or field.one_to_one or field.many_to_one:
+                    self.related_fields_name["FK"].append(field.name)
+
+    def _update_data_with_real_related_objects(self, data: Dict) -> Dict:
+        """Update the data with the real related objects from the database."""
+        for field_name in self.related_fields_name["FK"]:
+            if field_name in data and data[field_name] is not None:
+                related_model = self.model._meta.get_field(field_name).related_model
+                try:
+                    related_obj = related_model.objects.get(seed_id=data[field_name])
+                    data[field_name] = related_obj.pk
+                except related_model.DoesNotExist:
+                    self.error_logger(
+                        f"❌ Related object for field `{field_name}` with id `{data[field_name]}` does not exist."
+                    )
+                    data[field_name] = None
+
+        for field_name in self.related_fields_name["M2M"]:
+            if field_name in data and data[field_name] is not None:
+                related_model = self.model._meta.get_field(field_name).related_model
+                related_objs = []
+                for seed_id in data[field_name]:
+                    try:
+                        related_obj = related_model.objects.get(seed_id=seed_id)
+                        related_objs.append(related_obj.pk)
+                    except related_model.DoesNotExist:
+                        self.error_logger(
+                            f"❌ Related object for field `{field_name}` with id `{seed_id}` does not exist."
+                        )
+                data[field_name] = related_objs
+        return data
+
     def _create_entries(self, data_source: List | Dict) -> None:
         """Create all database entries based on source file data."""
         if not isinstance(data_source, list):
@@ -90,6 +131,7 @@ class BaseSeeder:
         """
         with self.source_file.open(mode="r", encoding="utf-8") as f:
             data = json.loads(f.read())
+            data = self._update_data_with_real_related_objects(data)
             if self.model.objects.count() == 0:
                 self._create_entries(data)
             elif authorize_update:

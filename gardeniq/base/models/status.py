@@ -2,13 +2,16 @@ from django.db import models
 
 from gardeniq.base.models import NameMixinModel
 from gardeniq.base.models import OptionalDescriptionMixinModel
+from gardeniq.base.models import SeederMixinModel
 
 
-class Status(NameMixinModel, OptionalDescriptionMixinModel):
+class Status(NameMixinModel, OptionalDescriptionMixinModel, SeederMixinModel):
     """
     Inherited fields:
       - `name`
       - `description`:optional
+      - `seed_id`
+      - `is_ready`
     """
 
     DEFAULT_COLOR = "#A2A2A2"

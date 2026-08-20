@@ -7,6 +7,8 @@ from gardeniq.base.serializers import BaseSerializer
 from gardeniq.base.serializers import NameMixinSerializer
 from gardeniq.base.serializers import OptionalDescriptionMixinSerializer
 from gardeniq.base.serializers import ReadOnlySerializer
+from gardeniq.base.serializers import SeederIsReadyMixinSerializer
+from gardeniq.base.serializers import SeederMixinSerializer
 
 color_regex = re.compile(r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$")
 
@@ -28,7 +30,7 @@ class StatusSerializer(
         model = Status
 
 
-class StatusReadOnlySerializer(ReadOnlySerializer, StatusSerializer):
+class StatusReadOnlySerializer(ReadOnlySerializer, SeederIsReadyMixinSerializer, StatusSerializer):
     """
     Note:
         Using a read-only serializer improves performance,
@@ -37,10 +39,26 @@ class StatusReadOnlySerializer(ReadOnlySerializer, StatusSerializer):
 
     Inherits from:
         ReadOnlySerializer: Provides read-only serialization behavior.
+        SeederIsReadyMixinSerializer: Adds the `is_ready` field to the serializer.
         StatusSerializer: Base serializer for Status model.
 
     This serializer is intended for use cases where Status data should be exposed
     in a read-only format, preventing any modifications through the API.
+    """
+
+    pass
+
+
+class StatusSeederSerializer(SeederMixinSerializer, StatusSerializer):
+    """
+    Serializer for seeding Status instances with additional fields for seeding.
+
+    Inherits from:
+        SeederMixinSerializer: Provides fields and behavior for seeding.
+        StatusSerializer: Base serializer for Status model.
+
+    This serializer is intended for use cases where Status data should be seeded
+    with additional fields, such as `seed_id` and `is_ready`.
     """
 
     pass

@@ -9,6 +9,39 @@ from gardeniq.base.models import NameMixinModel
 from gardeniq.base.models import OptionalDescriptionMixinModel
 from gardeniq.base.models import Status
 from gardeniq.hardware.protocols.settings import pattern_strict_version
+from gardeniq.hardware.validations import jsonschema_validation
+
+
+class DeviceCategory(NameMixinModel, OptionalDescriptionMixinModel):
+    """
+    Inherited fields:
+      - `name`
+      - `description`:optional
+    """
+
+    pins_configuration = models.JSONField(
+        default=dict,
+        verbose_name="pins configuration",
+        help_text="JSON object describing the pins configuration of this device category.",
+    )
+
+    class Meta:
+        verbose_name = "device category"
+        verbose_name_plural = "device categories"
+
+    def __str__(self) -> str:
+        return f"DeviceCategory `{self.name}`"
+
+    def save(self, *args, **kwargs) -> None:
+        """
+        Override the save method to validate the pins_configuration JSON field against
+        the DATASHEET_JSON_SCHEMA defined in settings before saving the instance.
+
+        Raises:
+            ValidationError: If the pins_configuration does not conform to the schema.
+        """
+        jsonschema_validation(self.pins_configuration, settings.DATASHEET_JSON_SCHEMA, "pins_configuration")
+        super().save(*args, **kwargs)
 
 
 class Device(NameMixinModel, OptionalDescriptionMixinModel):
@@ -18,14 +51,30 @@ class Device(NameMixinModel, OptionalDescriptionMixinModel):
       - `description`:optional
     """
 
+    AVAILABLE_COMM_PROTOCOLS = (("USB", "USB"),)
+
+    category = models.ForeignKey(
+        DeviceCategory,
+        on_delete=models.PROTECT,
+        related_name="devices",
+        verbose_name="device category",
+    )
     uid = models.CharField(
         max_length=32,
         unique=True,
+        blank=True,
         verbose_name="device uid",
         help_text="Unique device card UID (e.g: '12AB34567890DEAD').",
     )
+    communication_protocol = models.CharField(
+        max_length=16,
+        choices=AVAILABLE_COMM_PROTOCOLS,
+        verbose_name="communication protocol",
+        help_text="Communication protocol used by this device.",
+    )
     path = models.CharField(
         max_length=64,
+        blank=True,
         validators=[RegexValidator(settings.PATTERN_SERIAL_PORT)],
         verbose_name="card port path",
         help_text="Path of this card.",

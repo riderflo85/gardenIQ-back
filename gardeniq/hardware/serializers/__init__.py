@@ -3,6 +3,9 @@ from .controller import ControllerCategorySerializer
 from .controller import ControllerDetailReadOnlySerializer
 from .controller import ControllerListReadOnlySerializer
 from .controller import ControllerSerializer
+from .device import DeviceCategoryDetailReadOnlySerializer
+from .device import DeviceCategoryListReadOnlySerializer
+from .device import DeviceCategorySerializer
 from .device import DeviceDetailReadOnlySerializer
 from .device import DeviceMinimalReadOnlySerializer
 from .device import DeviceSerializer

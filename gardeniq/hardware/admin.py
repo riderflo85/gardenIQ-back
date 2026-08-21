@@ -9,6 +9,7 @@ from gardeniq.hardware.models import Channel
 from gardeniq.hardware.models import Controller
 from gardeniq.hardware.models import ControllerCategory
 from gardeniq.hardware.models import Device
+from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
 from gardeniq.hardware.models import Sensor
 from gardeniq.hardware.models import SensorCategory
@@ -22,6 +23,7 @@ class DeviceAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
+        "communication_protocol",
         "uid",
         "path",
         "status",
@@ -31,12 +33,23 @@ class DeviceAdmin(admin.ModelAdmin):
         "need_upgrade",
     )
     search_fields = ("name", "uid", "path")
-    list_filter = ("status", "need_upgrade", "gd_firmware_version", "mp_firmware_version")
+    list_filter = (
+        "status",
+        "need_upgrade",
+        "gd_firmware_version",
+        "mp_firmware_version",
+    )
     fieldsets = (
         (
             "Device Information",
             {
                 "fields": ("name", "description", "uid", "path"),
+            },
+        ),
+        (
+            "Device type",
+            {
+                "fields": ("category", "communication_protocol"),
             },
         ),
         (
@@ -69,6 +82,14 @@ class DeviceAdmin(admin.ModelAdmin):
         form = super().get_form(request, obj, **kwargs)
         form.base_fields["path"] = TypedChoiceField(choices=self._get_serial_port_choices(), coerce=str)  # type: ignore
         return form
+
+
+@admin.register(DeviceCategory)
+class DeviceCategoryAdmin(admin.ModelAdmin):
+    """Admin interface for the DeviceCategory model."""
+
+    list_display = ("id", "name", "description")
+    search_fields = ("name",)
 
 
 @admin.register(Channel)

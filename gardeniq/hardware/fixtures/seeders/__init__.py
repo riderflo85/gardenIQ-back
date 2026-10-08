@@ -1,0 +1,1 @@
+from .devicecategory import DeviceCategorySeeder

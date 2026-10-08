@@ -5,6 +5,7 @@ from django.contrib import admin
 from django.forms import TypedChoiceField
 from django.http import HttpRequest
 
+from gardeniq.base.admin import seeder_fields_name
 from gardeniq.hardware.models import Channel
 from gardeniq.hardware.models import Controller
 from gardeniq.hardware.models import ControllerCategory
@@ -88,8 +89,9 @@ class DeviceAdmin(admin.ModelAdmin):
 class DeviceCategoryAdmin(admin.ModelAdmin):
     """Admin interface for the DeviceCategory model."""
 
-    list_display = ("id", "name", "description")
-    search_fields = ("name",)
+    list_display = ("id", "name", "description") + seeder_fields_name
+    search_fields = ("name",) + seeder_fields_name
+    list_filter = ("name",) + seeder_fields_name
 
 
 @admin.register(Channel)

@@ -10,6 +10,8 @@ from gardeniq.base.serializers import BaseSerializer
 from gardeniq.base.serializers import NameMixinSerializer
 from gardeniq.base.serializers import OptionalDescriptionMixinSerializer
 from gardeniq.base.serializers import ReadOnlySerializer
+from gardeniq.base.serializers import SeederIsReadyMixinSerializer
+from gardeniq.base.serializers import SeederMixinSerializer
 from gardeniq.base.serializers import StatusReadOnlySerializer
 from gardeniq.base.serializers import StatusSerializer
 from gardeniq.base.serializers.mixins import PKMixinSerializer
@@ -24,8 +26,15 @@ def get_serial_port_choices() -> List[str]:
     return [f"/dev/{s_p}" for s_p in serial_ports]
 
 
-class DeviceCategorySerializer(BaseSerializer, NameMixinSerializer, OptionalDescriptionMixinSerializer):
+class DeviceCategorySerializer(
+    BaseSerializer,
+    NameMixinSerializer,
+    OptionalDescriptionMixinSerializer,
+    SeederIsReadyMixinSerializer,
+):
     pins_configuration = serializers.JSONField(default=dict)
+    # Override is_ready field to be read-only and default to True
+    is_ready = serializers.BooleanField(read_only=True, default=True)
 
     class Meta:
         model = DeviceCategory
@@ -50,6 +59,10 @@ class DeviceCategoryListReadOnlySerializer(ReadOnlySerializer, DeviceCategorySer
 
 
 class DeviceCategoryDetailReadOnlySerializer(ReadOnlySerializer, DeviceCategorySerializer):
+    pass
+
+
+class DeviceCategorySeederSerializer(SeederMixinSerializer, DeviceCategorySerializer):
     pass
 
 

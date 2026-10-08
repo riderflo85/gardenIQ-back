@@ -7,14 +7,17 @@ from gardeniq.__version__ import garden_firmware_version
 from gardeniq.__version__ import micropython_version
 from gardeniq.base.models import NameMixinModel
 from gardeniq.base.models import OptionalDescriptionMixinModel
+from gardeniq.base.models import SeederMixinModel
 from gardeniq.base.models import Status
 from gardeniq.hardware.protocols.settings import pattern_strict_version
 from gardeniq.hardware.validations import jsonschema_validation
 
 
-class DeviceCategory(NameMixinModel, OptionalDescriptionMixinModel):
+class DeviceCategory(SeederMixinModel, NameMixinModel, OptionalDescriptionMixinModel):
     """
     Inherited fields:
+      - `seed_id`
+      - `is_ready`
       - `name`
       - `description`:optional
     """

@@ -34,7 +34,7 @@ class UserAPIModelView(BaseAPIModelViewSet):
     list: GET /api/users/ - List all users (admin only)
     retrieve: GET /api/users/{id}/ - User details (self detail if not admin or any if is admin)
     create: POST /api/users/ - Create a user (admin only)
-    update: PUT /api/users/{id}/ - Update a user (admin only)
+    update: PUT /api/users/{id}/ - Update a user (owner or admin)
     partial_update: Not allowed
     destroy: DELETE /api/users/{id}/ - Delete a user (admin only)
     me: GET /api/users/me/ - Get authenticated user info

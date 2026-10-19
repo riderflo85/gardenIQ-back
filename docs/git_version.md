@@ -18,7 +18,7 @@ gitGraph
 ```
 
 - Dépôt : `riderflo85/gardenIQ-back`, branche par défaut `main`.
-- Le suivi des tickets se fait dans le kanban Notion (« Tableau kanban ») : `TK-<id>` est le champ `Id carte` de la carte (`TK` = « Ticket »). Le statut de la carte suit le travail : `À faire` → `En développement` (branche créée) → `Code review & test` (PR ouverte) → `À merge` (PR relue) → `Fait` (PR fusionnée). Les skills `ticket` et `ticket-create` pilotent ce suivi par le serveur MCP Notion ; voir « Notion » dans `CLAUDE.md`.
+- Le suivi des tickets se fait dans le kanban Notion (« Tableau kanban ») : `TK-<id>` est le champ `Id carte` de la carte (`TK` = « Ticket »). Le statut de la carte suit le travail : `À faire` → `En développement` (branche créée) → `Code review & test` (PR ouverte) → `À merge` (PR relue) → `Fait` (PR fusionnée). L'intégration GitHub de Notion relie la PR au ticket et passe celui-ci à `Code review & test` après l'ouverture de la PR ; les skills `ticket` et `ticket-create` pilotent le reste par le serveur MCP Notion et relisent le ticket avant d'écrire un statut. Voir « Notion » dans `CLAUDE.md`.
 - Une CI GitHub Actions tourne à chaque push : `black --check ./gardeniq`, `isort --check-only`, `flake8`, `pytest --cov`.
 
 ## Nommage des branches

@@ -166,7 +166,7 @@ Afficher la synthèse dans le chat, puis l'URL retournée :
 
 La CI démarre au push : `gh pr checks` donne son état. Ne pas dire qu'elle est verte sans l'avoir lu.
 
-**Notion.** Proposer de passer le ticket à `Code review & test` (skill `ticket`, étape 6) et attendre la confirmation. Relire ensuite le ticket : la relation `Pull Requests GitHub` doit lister la PR (le titre `(TK-<id>)(<type>) …` porte le numéro). Si elle est vide, le dire ; ne pas la renseigner à la main.
+**Notion.** Ne pas écrire le statut du ticket : l'intégration GitHub de Notion relie la PR (relation `Pull Requests GitHub`, le titre `(TK-<id>)(<type>) …` porte le numéro) et passe le ticket à `Code review & test` toute seule, quelques minutes après l'ouverture. Relire le ticket (skill `ticket`, étape 6) : s'il est conforme, le dire ; s'il ne l'est pas après un délai raisonnable, le signaler et proposer la transition, à confirmer. Ne jamais renseigner la relation à la main.
 
 ## Fusion d'une PR existante (`pr-create merge`)
 
@@ -227,7 +227,7 @@ Le titre du dernier commit de `<cible>` doit être `<titre> (#<n>)`. Sinon, le d
 
 Proposer `git switch <cible> && git pull` ; ne pas le faire sans demande.
 
-**Notion.** Proposer de passer le ticket à `Fait` (skill `ticket`, étape 6) une fois la fusion vérifiée, et attendre la confirmation. Si les entrées du backlog liées à ce ticket sont corrigées par la PR, le dire pour qu'elles passent à `Traité`.
+**Notion.** Après la fusion, relire le ticket au bout de quelques minutes (skill `ticket`, étape 6) : si l'intégration l'a passé à `Fait`, le dire ; sinon proposer la transition une fois la fusion vérifiée, à confirmer. Noter dans le skill `ticket` ce qui a été observé (statut intermédiaire `À merge`, délai). Si les entrées du backlog liées à ce ticket sont corrigées par la PR, le dire pour qu'elles passent à `Traité`.
 
 ## À éviter
 

@@ -114,7 +114,16 @@ Les commits passent par le skill `commit`, la PR par `pr-create`. Les critères 
 | PR relue et prête à fusionner | `À merge` |
 | PR fusionnée sur `main` (`pr-create merge`) | `Fait` |
 
-Chaque transition est **proposée puis confirmée** : le kanban est partagé avec l'équipe. Une demande explicite de l'utilisateur dans le même message vaut confirmation. Ne jamais revenir en arrière sans le demander, ne jamais mettre `Fait` avant d'avoir vérifié que la PR est fusionnée (`gh pr view <n> --json state`).
+**L'intégration GitHub de Notion fait avancer le statut toute seule** une fois la PR ouverte : sur TK-75, quelques minutes après l'ouverture de la PR, le statut est passé à `Code review & test` et la relation `Pull Requests GitHub` s'est remplie, sans aucune écriture du skill. Ne pas écrire un statut avant d'avoir **relu** le ticket après l'événement :
+
+1. Après la création de la branche, `En développement` est écrit par ce skill (étape 4) : l'intégration ne l'a pas fait.
+2. Après chaque événement suivant (PR ouverte, PR relue, PR fusionnée), attendre quelques minutes, puis relire le ticket (`notion-fetch`).
+3. Statut déjà conforme au tableau : ne rien écrire, le dire.
+4. Statut inchangé après un délai raisonnable : le signaler et **proposer** la transition, à confirmer.
+
+Pour `À merge` et `Fait`, le comportement de l'intégration n'a pas encore été observé : c'est à constater à la première fusion, puis à noter ici.
+
+Toute écriture reste **proposée puis confirmée** : le kanban est partagé avec l'équipe. Une demande explicite de l'utilisateur dans le même message vaut confirmation. Ne jamais revenir en arrière sans le demander, ne jamais mettre `Fait` avant d'avoir vérifié que la PR est fusionnée (`gh pr view <n> --json state`).
 
 ```json
 {"page_id": "<id>", "command": "update_properties", "properties": {"Statut": "Code review & test"}}
@@ -122,7 +131,7 @@ Chaque transition est **proposée puis confirmée** : le kanban est partagé ave
 
 ### 7. Lien avec les pull requests
 
-Les PR sont synchronisées depuis GitHub dans une base liée (relation `Pull Requests GitHub`), que le MCP ne peut pas lire directement (erreur 404 sur sa source de données). Les titres de PR `(TK-<id>)(<type>) …` portent le numéro du ticket. Après la création d'une PR, relire le ticket : si la relation est vide, le dire à l'utilisateur ; ne pas la renseigner à la main. Pour lire une PR liée, utiliser l'URL de la page donnée dans la relation (`notion-fetch`).
+Les PR sont synchronisées depuis GitHub dans une base liée (relation `Pull Requests GitHub`), que le MCP ne peut pas lire directement (erreur 404 sur sa source de données). Les titres de PR `(TK-<id>)(<type>) …` portent le numéro du ticket. Après la création d'une PR, relire le ticket au bout de quelques minutes : la relation doit lister la PR (observé sur TK-75). Si elle est vide, le dire à l'utilisateur ; ne pas la renseigner à la main. Pour lire une PR liée, utiliser l'URL de la page donnée dans la relation (`notion-fetch`).
 
 ### 8. Rendre compte
 

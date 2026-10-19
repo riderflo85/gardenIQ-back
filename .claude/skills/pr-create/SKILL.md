@@ -79,6 +79,8 @@ Label de type d'après le type de la branche (insensible à la casse) :
 | `test` | `test` | `FFC107` |
 | `chore` | `chore` | `AAAAAA` |
 
+**Label de statut** (labels existants du dépôt, vérifiés avec `gh label list`) : `ready to review` par défaut, `work in progress` avec `--draft`. À la fusion, la PR relue passe à `ready to merge` (voir « Fusion d'une PR existante »). Ne jamais créer ces labels : ils existent.
+
 Type absent de ce tableau : ne pas inventer de label. Proposer à l'utilisateur, au cas par cas, un nom et une couleur, et attendre son accord ; s'il valide, l'ajouter au tableau ci-dessus pour les prochaines fois.
 
 ### 5. Générer le markdown de la description (en français)
@@ -118,7 +120,7 @@ Cette étape pousse la branche sur `origin` et crée un objet visible par l'équ
 ```
 Titre       : <titre>
 <branche> → <cible>
-Label       : <label de type>
+Labels      : <label de type>, <label de statut>
 Assigné à   : @me
 Reviewer    : <login(s) donné(s) par l'utilisateur, ou aucun>
 Brouillon   : <oui/non>
@@ -144,7 +146,7 @@ gh pr create \
   --head <branche> \
   --title "<titre>" \
   --body-file - \
-  --label "<label>" \
+  --label "<label de type>,<label de statut>" \
   --assignee @me \
   [--reviewer "<login>[,<login>]"] \
   [--draft] <<'PR_BODY'
@@ -188,11 +190,20 @@ Action visible par toute l'équipe et difficile à annuler : afficher le récapi
 PR          : <titre> (#<n>)
 <branche> → <cible>
 CI          : <état lu>
+Label       : ready to review → ready to merge
 Message sur <cible> : <titre> (#<n>)
 Suppression de la branche source : oui
 ```
 
 ### c. Fusionner
+
+Avant la fusion, passer le label de statut à `ready to merge` :
+
+```bash
+gh pr edit <n> --remove-label "ready to review" --add-label "ready to merge"
+```
+
+Puis :
 
 ```bash
 gh pr merge <n> --squash --delete-branch

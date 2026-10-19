@@ -78,6 +78,7 @@ Le skill `pr-create` rédige la synthèse et crée la PR avec `gh` ; `pr-create 
 - **Titre** : `(TK-<id>)(<type>) <description>`. Il devient le message du commit sur `main`.
 - **Assigné** : l'auteur. **Reviewer** : à choisir à chaque PR avec l'auteur, jamais automatiquement.
 - **Label de type** : `feature`, `bug`, `enhancement`, `refactor`, `documentation`, `test` ou `chore`, selon le type de la branche. La liste évolue au cas par cas.
+- **Label de statut** : `ready to review` à l'ouverture (`work in progress` pour un brouillon), puis `ready to merge` avant la fusion.
 - **CI verte** et PR ni en brouillon ni en conflit avant de fusionner.
 
 À la fusion :

@@ -15,9 +15,7 @@ Tout passe par un environnement de dev pipenv: `pipenv shell`. Les commandes dja
 | Tests plus rapides | réutilise la base de test, `--reuse-db`, `-x` (stoppe au premier échec), parallélisation des tests avec `-n auto` (utilise pytest-xdist, ~35 s) |
 | Un test précis | `pytest [options pytest] -- gardeniq/<app>/tests/<dossier>/<fichier>.py::<test>` |
 | Couverture (comme la CI) | `pytest --cov=. --cov-report=term-missing` |
-| Commande Django | `./manage.py <commande>` |
 | Serveur, shell | `pipenv run server`, `pipenv run shell` (`shell_plus`) |
-| Migrations | `./manage.py makemigrations` `./manage.py migrate` |
 | Fixtures (seeders) | `./manage.py seed [--app <app>] [--update]` |
 | Matériel USB | `./manage.py list_devices [--verbose]`, `check_connection <port> <baud>`, `cmd <port> <baud>` |
 | Mettre à jour les dépendances | `pipenv run update_dep` (régénère `Pipfile.lock`, `requirements.txt` et `requirements_dev.txt`, utilisés par la CI) |
@@ -39,7 +37,6 @@ Les règles à ne jamais enfreindre :
 - Les erreurs attendues sont gérées explicitement dans la vue ; `APIException` en dernier recours.
 - Une `Meta` qui combine des parents hérite explicitement de leurs `Meta` quand ils y définissent des attributs (ex. `class Meta(BaseSerializer.Meta, AutocompleteSlugMixinSerializer.Meta)` dans `orderlg/serializers/order.py`). Les `Meta` des modèles Django n'héritent pas.
 - Tests de vues : hériter de `ViewSetTestMixin` (`base/utils/tests.py`, `MODEL`, `BASE_PATTERN`, `DATA_TO_DEFAULT_OBJ`). Il n'y a pas de factories.
-- Style : black, isort, flake8 à 120 colonnes (`pyproject.toml`, `setup.cfg`). Les migrations sont exclues de black, isort et flake8.
 
 ## Typage
 
@@ -53,7 +50,7 @@ Typer au maximum, pour la lisibilité et l'aide de l'éditeur :
 
 ## Git et GitHub
 
-Détail dans @docs/git_version.md.
+Détail dans `docs/git_version.md` (lu par les skills `commit`, `pre-push`, `pr-create`).
 
 - Flux : GitHub Flow, branches courtes depuis `main`, une PR par branche (dépôt `riderflo85/gardenIQ-back`).
 - Branche : `(TK-<id>)(<type>)-<slug>` (ex. `(TK-61)(feat)-Optimise-remove-and-add-models`). `TK` = « Ticket » : `<id>` est le numéro de la carte du kanban Notion.
@@ -66,7 +63,6 @@ Détail dans @docs/git_version.md.
 - Si un fichier de migration est généré, il fait partie du même changement.
 
 Hooks : `.git/hooks/pre-commit` est le framework `pre-commit` (`pre-commit install`) : il lance black, flake8, isort, check-json, end-of-file-fixer et trailing-whitespace sur les fichiers indexés. Ne jamais contourner avec `--no-verify`.
-CI (GitHub Actions, à chaque push) : `black --check ./gardeniq`, `isort --check-only`, `flake8`, `pytest --cov`.
 
 ## Garde-fous
 

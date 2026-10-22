@@ -31,21 +31,6 @@
       "mcp__notion__notion-get-users",
       "mcp__notion__notion-get-tool-access"
     ],
-    "ask": [
-      "Bash(git commit:*)",
-      "Bash(pipenv run git commit:*)",
-      "Bash(git push:*)",
-      "Bash(pipenv run git push:*)",
-      "Bash(gh pr create:*)",
-      "Bash(gh pr merge:*)",
-      "Bash(gh pr edit:*)",
-      "Bash(gh label create:*)",
-      "mcp__notion__notion-create-pages",
-      "mcp__notion__notion-update-page",
-      "mcp__notion__notion-create-comment",
-      "mcp__notion__notion-move-pages",
-      "mcp__notion__notion-duplicate-page"
-    ],
     "deny": [
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
@@ -61,6 +46,24 @@
       "mcp__notion__notion-delete-comment",
       "mcp__notion__notion-update-data-source",
       "mcp__notion__notion-create-database"
+    ],
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(pipenv run git commit:*)",
+      "Bash(git push:*)",
+      "Bash(pipenv run git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr edit:*)",
+      "Bash(gh label create:*)",
+      "mcp__notion__notion-create-pages",
+      "mcp__notion__notion-update-page",
+      "mcp__notion__notion-create-comment",
+      "mcp__notion__notion-move-pages",
+      "mcp__notion__notion-duplicate-page"
     ]
+  },
+  "enabledPlugins": {
+    "pyright-lsp@claude-plugins-official": true
   }
 }

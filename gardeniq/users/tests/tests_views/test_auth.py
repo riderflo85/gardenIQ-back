@@ -5,12 +5,18 @@ Tests cover login functionality, throttling, and user profile retrieval.
 Uses the GIVEN-WHEN-THEN pattern for clarity.
 """
 
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from rest_framework import status
 from rest_framework.reverse import reverse
+from rest_framework.test import APIClient
 
 import pytest
+from knox.models import AuthToken
+from knox.settings import knox_settings
 
 from gardeniq.base.utils.tests import ViewSetTestMixin
 
@@ -383,6 +389,111 @@ class TestLogoutAllView(ViewSetTestMixin):
 
         # WHEN
         response = unauthenticated_client.post(url)
+
+        # THEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.django_db
+class TestTokenLimitAndExpiry(ViewSetTestMixin):
+    """Tests for the token limit per user, the token lifetime and the Authorization header format."""
+
+    CREDENTIALS = {"username": "regularuser", "password": "RegularPass123!"}
+
+    def _login(self, api_client):
+        """Log in with the regular user credentials and return the response."""
+        return api_client.post(reverse("knox_login"), data=self.CREDENTIALS, format="json")
+
+    def _fill_token_limit(self, api_client) -> list[str]:
+        """Log in until the user holds the maximum number of tokens, and return them."""
+        tokens = []
+        for _ in range(knox_settings.TOKEN_LIMIT_PER_USER):
+            response = self._login(api_client)
+            assert response.status_code == status.HTTP_200_OK
+            tokens.append(response.data["token"])
+        return tokens
+
+    def test_login_refused_when_token_limit_reached(self, api_client, regular_user):
+        """Test that a login is refused when the user already holds the maximum number of tokens."""
+        # GIVEN
+        # Regular user holding TOKEN_LIMIT_PER_USER active tokens
+        self._fill_token_limit(api_client)
+
+        # WHEN
+        response = self._login(api_client)
+
+        # THEN
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.data["error"] == "Maximum amount of tokens allowed per user exceeded."
+        assert AuthToken.objects.filter(user=regular_user).count() == knox_settings.TOKEN_LIMIT_PER_USER
+
+    def test_logout_frees_a_token_slot(self, api_client, regular_user):
+        """Test that revoking a token allows a new login when the limit was reached."""
+        # GIVEN
+        # Regular user at the token limit, logging out with the last token
+        tokens = self._fill_token_limit(api_client)
+        api_client.credentials(HTTP_AUTHORIZATION=f"Token {tokens[-1]}")
+        assert api_client.post(reverse("knox_logout")).status_code == status.HTTP_204_NO_CONTENT
+        api_client.credentials()
+
+        # WHEN
+        response = self._login(api_client)
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_expired_tokens_do_not_count_in_the_limit(self, api_client, regular_user):
+        """Test that an expired token does not count towards the token limit."""
+        # GIVEN
+        # Regular user at the token limit, one of the tokens being expired
+        self._fill_token_limit(api_client)
+        expired = AuthToken.objects.filter(user=regular_user).first()
+        AuthToken.objects.filter(pk=expired.pk).update(expiry=timezone.now() - timedelta(seconds=1))
+
+        # WHEN
+        response = self._login(api_client)
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_expired_token_is_rejected(self, api_client, regular_user):
+        """Test that an expired token can no longer authenticate."""
+        # GIVEN
+        # A token that has just expired
+        token = self._login(api_client).data["token"]
+        AuthToken.objects.filter(user=regular_user).update(expiry=timezone.now() - timedelta(seconds=1))
+        api_client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
+
+        # WHEN
+        response = api_client.get(reverse("users-me"))
+
+        # THEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert str(response.data["detail"]) == "Invalid token."
+
+    def test_token_lifetime_matches_the_configured_ttl(self, api_client, regular_user):
+        """Test that a new token expires TOKEN_TTL after its creation."""
+        # GIVEN
+        # A freshly created token
+        assert self._login(api_client).status_code == status.HTTP_200_OK
+        token = AuthToken.objects.get(user=regular_user)
+
+        # WHEN
+        lifetime = token.expiry - token.created
+
+        # THEN
+        assert abs(lifetime - knox_settings.TOKEN_TTL) < timedelta(seconds=5)
+
+    def test_bearer_prefix_is_rejected(self, api_client, regular_user):
+        """Test that the Authorization header must use the Token prefix, not Bearer."""
+        # GIVEN
+        # A valid token sent with the Bearer prefix by a client without session cookie (like a script)
+        token = self._login(api_client).data["token"]
+        script_client = APIClient()
+        script_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+        # WHEN
+        response = script_client.get(reverse("users-me"))
 
         # THEN
         assert response.status_code == status.HTTP_401_UNAUTHORIZED

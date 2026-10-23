@@ -18,7 +18,7 @@ class LoginThrottle(AnonRateThrottle):
 class LoginView(KnoxLoginView):
     """
     Custom login view that returns user data along with the token.
-    POST /api/login/
+    POST /api/auth/login/
     Body: {"username": "user", "password": "pass"}
     Returns: token, user data, expiry
     """

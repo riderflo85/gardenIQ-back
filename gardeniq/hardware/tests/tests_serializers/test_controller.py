@@ -5,6 +5,7 @@ from gardeniq.hardware.models import Channel
 from gardeniq.hardware.models import Controller
 from gardeniq.hardware.models import ControllerCategory
 from gardeniq.hardware.models import Device
+from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
 from gardeniq.hardware.serializers import ControllerCategoryReadOnlySerializer
 from gardeniq.hardware.serializers import ControllerCategorySerializer
@@ -29,12 +30,21 @@ def device_status(db):
 
 
 @pytest.fixture
-def device(device_status):
+def device_category(db):
+    return DeviceCategory.objects.create(
+        name="Test Category",
+        pins_configuration={"available_channels": [], "digits": [], "pwms": [], "analogs": []},
+    )
+
+
+@pytest.fixture
+def device(device_status, device_category):
     return Device.objects.create(
         name="Test Device",
         uid="AABBCCDDEEFF0011",
         path="/dev/ttyUSB0",
         status=device_status,
+        category=device_category,
     )
 
 
@@ -526,7 +536,7 @@ class TestControllerDetailReadOnlySerializer:
             "channel_choiced": channel.name,
         }
 
-    def test_serialized_instance_device_detail_fields(self, controller, device, device_status):
+    def test_serialized_instance_device_detail_fields(self, controller, device, device_status, device_category):
         """
         GIVEN: an existing Controller instance with a Device
         WHEN: serializing with ControllerDetailReadOnlySerializer
@@ -550,6 +560,14 @@ class TestControllerDetailReadOnlySerializer:
             "gd_firmware_version": device.gd_firmware_version,
             "mp_firmware_version": device.mp_firmware_version,
             "need_upgrade": device.need_upgrade,
+            "communication_protocol": device.communication_protocol,
+            "category": {
+                "id": device_category.pk,
+                "name": device_category.name,
+                "description": device_category.description,
+                "is_ready": device_category.is_ready,
+                "pins_configuration": device_category.pins_configuration,
+            },
             "status": {
                 "id": device_status.pk,
                 "name": device_status.name,

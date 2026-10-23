@@ -6,6 +6,7 @@ from gardeniq.base.models import Status
 from gardeniq.base.utils.tests import ViewSetTestMixin
 from gardeniq.hardware.models import Channel
 from gardeniq.hardware.models import Device
+from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
 
 # ─── Channel View Tests ────────────────────────────────────────────────────────
@@ -147,12 +148,20 @@ class PinViewSetTestConf(ViewSetTestMixin):
         return Status.objects.create(name="Generic", tag="device-generic", color="#123456")
 
     @pytest.fixture
-    def device(self, device_status):
+    def device_category(self):
+        return DeviceCategory.objects.create(
+            name="Test Category",
+            pins_configuration={"available_channels": [], "digits": [], "pwms": [], "analogs": []},
+        )
+
+    @pytest.fixture
+    def device(self, device_status, device_category):
         return Device.objects.create(
             name="Test Device",
             uid="AABBCCDDEEFF0011",
             path="/dev/ttyUSB0",
             status=device_status,
+            category=device_category,
         )
 
     @pytest.fixture

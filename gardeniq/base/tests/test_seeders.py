@@ -53,6 +53,7 @@ class TestManager:
         expected_seeders_name = [
             "StatusSeeder",
             "OrderSeeder",
+            "DeviceCategorySeeder",
         ]
 
         # WHEN
@@ -71,6 +72,7 @@ class TestManager:
         [
             ("orderlg", ["OrderSeeder"]),
             ("base", ["StatusSeeder"]),
+            ("hardware", ["DeviceCategorySeeder"]),
         ],
     )
     def test_import_seeders_with_app_name(self, app_name, expected_seeders_name):

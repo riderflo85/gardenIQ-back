@@ -6,6 +6,7 @@ import pytest
 from gardeniq.base.models import Status
 from gardeniq.hardware.models import Channel
 from gardeniq.hardware.models import Device
+from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -17,12 +18,21 @@ def device_status(db):
 
 
 @pytest.fixture
-def device(device_status):
+def device_category(db):
+    return DeviceCategory.objects.create(
+        name="Test Category",
+        pins_configuration={"available_channels": [], "digits": [], "pwms": [], "analogs": []},
+    )
+
+
+@pytest.fixture
+def device(device_status, device_category):
     return Device.objects.create(
         name="Test Device",
         uid="AABBCCDDEEFF0011",
         path="/dev/ttyUSB0",
         status=device_status,
+        category=device_category,
     )
 
 
@@ -317,7 +327,7 @@ class TestPinConstraints:
         with pytest.raises(IntegrityError):
             Pin.objects.create(device=device, channel_choiced=channel, pin_number=1)
 
-    def test_same_pin_number_on_different_devices_is_allowed(self, device, channel, device_status):
+    def test_same_pin_number_on_different_devices_is_allowed(self, device, channel, device_status, device_category):
         """
         GIVEN: two distinct Devices
         WHEN: creating a Pin with the same pin_number on each Device
@@ -329,6 +339,7 @@ class TestPinConstraints:
             uid="1122334455667788",
             path="/dev/ttyUSB1",
             status=device_status,
+            category=device_category,
         )
 
         # WHEN

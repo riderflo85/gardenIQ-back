@@ -2,6 +2,11 @@ import pytest
 
 from gardeniq.base.models import Status
 from gardeniq.hardware.models import Device
+from gardeniq.hardware.models import DeviceCategory
+from gardeniq.hardware.serializers import DeviceCategoryDetailReadOnlySerializer
+from gardeniq.hardware.serializers import DeviceCategoryListReadOnlySerializer
+from gardeniq.hardware.serializers import DeviceCategorySeederSerializer
+from gardeniq.hardware.serializers import DeviceCategorySerializer
 from gardeniq.hardware.serializers import DeviceDetailReadOnlySerializer
 from gardeniq.hardware.serializers import DeviceSerializer
 
@@ -23,19 +28,23 @@ def status_device(db):
 @pytest.mark.django_db
 class TestDeviceSerializer:
 
-    def test_valid_serializer(self, mock_serial_ports, status_device):
+    def test_valid_serializer(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         data = {
             "name": "Garden Sensor 1",
             "description": "Main garden sensor",
             "path": "/dev/ttyUSB0",
             "status": status_device.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
         }
         expected = {
             "name": "Garden Sensor 1",
             "description": "Main garden sensor",
             "path": "/dev/ttyUSB0",
             "status": status_device.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
         }
 
         # WHEN
@@ -45,17 +54,21 @@ class TestDeviceSerializer:
         assert ser.is_valid()
         assert ser.data == expected
 
-    def test_valid_serializer_without_description(self, mock_serial_ports, status_device):
+    def test_valid_serializer_without_description(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         data = {
             "name": "Garden Sensor 2",
             "path": "/dev/ttyUSB1",
             "status": status_device.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
         }
         expected = {
             "name": "Garden Sensor 2",
             "path": "/dev/ttyUSB1",
             "status": status_device.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
         }
 
         # WHEN
@@ -65,13 +78,15 @@ class TestDeviceSerializer:
         assert ser.is_valid()
         assert ser.data == expected
 
-    def test_create_device(self, mock_serial_ports, status_device):
+    def test_create_device(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         data = {
             "name": "Garden Sensor 1",
             "description": "Main garden sensor",
             "path": "/dev/ttyUSB0",
             "status": status_device.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
         }
 
         # WHEN
@@ -88,12 +103,14 @@ class TestDeviceSerializer:
         assert device.status == status_device
         assert device.uid == "12AB34567890DEAD"
 
-    def test_create_device_without_description(self, mock_serial_ports, status_device):
+    def test_create_device_without_description(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         data = {
             "name": "Garden Sensor 2",
             "path": "/dev/ttyACM0",
             "status": status_device.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
         }
 
         # WHEN
@@ -109,7 +126,7 @@ class TestDeviceSerializer:
         assert device.path == data["path"]
         assert device.status == status_device
 
-    def test_update_device(self, mock_serial_ports, status_device):
+    def test_update_device(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         device = Device.objects.create(
             name="Old Name",
@@ -117,12 +134,15 @@ class TestDeviceSerializer:
             uid="12AB34567890DEAD",
             path="/dev/ttyUSB0",
             status=status_device,
+            category=device_category,
         )
         updated_data = {
             "name": "Updated Name",
             "description": "Updated description",
             "path": "/dev/ttyUSB1",
             "status": status_device.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
         }
 
         # WHEN
@@ -138,7 +158,7 @@ class TestDeviceSerializer:
         assert device.path == updated_data["path"]
         assert device.status == status_device
 
-    def test_update_device_change_status(self, mock_serial_ports, status_device):
+    def test_update_device_change_status(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         new_status = Status.objects.create(name="Inactive", tag="device-inactive", color="#FF0000")
         device = Device.objects.create(
@@ -146,11 +166,14 @@ class TestDeviceSerializer:
             uid="12AB34567890DEAD",
             path="/dev/ttyUSB0",
             status=status_device,
+            category=device_category,
         )
         updated_data = {
             "name": "Garden Sensor",
             "path": "/dev/ttyUSB0",
             "status": new_status.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
         }
 
         # WHEN
@@ -162,12 +185,14 @@ class TestDeviceSerializer:
         # THEN
         assert device.status == new_status
 
-    def test_readonly_fields(self, mock_serial_ports, status_device):
+    def test_readonly_fields(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         data = {
             "name": "Garden Sensor",
             "path": "/dev/ttyUSB0",
             "status": status_device.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
             "uid": "FAKEFAKEFAKEFAKE",
             "gd_firmware_version": "1.0.0",
             "mp_firmware_version": "1.21.0",
@@ -189,7 +214,7 @@ class TestDeviceSerializer:
     def test_errors_missing_required_fields(self, mock_serial_ports):
         # GIVEN
         data = {
-            "description": "Description without name or path",
+            "description": "Description without required fields",
         }
 
         # WHEN
@@ -199,15 +224,19 @@ class TestDeviceSerializer:
         assert not ser.is_valid()
         assert ser.errors
         assert "name" in ser.errors
-        assert "path" in ser.errors
+        assert "path" not in ser.errors  # optional
         assert "status" in ser.errors
+        assert "category" in ser.errors
+        assert "communication_protocol" in ser.errors
 
-    def test_errors_invalid_path_not_in_choices(self, mock_serial_ports, status_device):
+    def test_errors_invalid_path_not_in_choices(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         data = {
             "name": "Garden Sensor",
             "path": "/dev/ttyUSB5",  # Not in mock choices
             "status": status_device.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
         }
 
         # WHEN
@@ -232,12 +261,14 @@ class TestDeviceSerializer:
         assert not ser.is_valid()
         assert "status" in ser.errors
 
-    def test_errors_empty_name(self, mock_serial_ports, status_device):
+    def test_errors_empty_name(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         data = {
             "name": "",
             "path": "/dev/ttyUSB0",
             "status": status_device.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
         }
 
         # WHEN
@@ -247,12 +278,14 @@ class TestDeviceSerializer:
         assert not ser.is_valid()
         assert "name" in ser.errors
 
-    def test_serial_port_choices_initialized(self, mock_serial_ports, status_device):
+    def test_serial_port_choices_initialized(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         data = {
             "name": "Garden Sensor",
             "path": "/dev/ttyUSB0",
             "status": status_device.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
         }
         available_ports = {p: p for p in ["/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyACM0"]}
 
@@ -270,13 +303,15 @@ class TestDeviceSerializer:
 @pytest.mark.django_db
 class TestDeviceDetailReadOnlySerializer:
 
-    def test_cannot_create_device(self, mock_serial_ports, status_device):
+    def test_cannot_create_device(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         device_count_before = Device.objects.count()
         data = {
             "name": "Garden Sensor",
             "path": "/dev/ttyUSB0",
             "status": status_device.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
         }
 
         # WHEN
@@ -288,18 +323,21 @@ class TestDeviceDetailReadOnlySerializer:
         # THEN
         assert Device.objects.count() == device_count_before
 
-    def test_cannot_update_device(self, mock_serial_ports, status_device):
+    def test_cannot_update_device(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         device = Device.objects.create(
             name="Garden Sensor",
             uid="12AB34567890DEAD",
             path="/dev/ttyUSB0",
             status=status_device,
+            category=device_category,
         )
         updated_data = {
             "name": "Updated Name",
             "path": "/dev/ttyUSB1",
             "status": status_device.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
         }
 
         # WHEN
@@ -308,7 +346,7 @@ class TestDeviceDetailReadOnlySerializer:
         with pytest.raises(NotImplementedError):
             ser.save()
 
-    def test_serialize_device(self, mock_serial_ports, status_device):
+    def test_serialize_device(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         device = Device.objects.create(
             name="Garden Sensor",
@@ -316,6 +354,7 @@ class TestDeviceDetailReadOnlySerializer:
             uid="12AB34567890DEAD",
             path="/dev/ttyUSB0",
             status=status_device,
+            category=device_category,
             gd_firmware_version="1.2.3",
             mp_firmware_version="1.21.0",
         )
@@ -333,6 +372,14 @@ class TestDeviceDetailReadOnlySerializer:
             "uid": "12AB34567890DEAD",
             "path": "/dev/ttyUSB0",
             "status": expected_status,
+            "category": {
+                "id": device_category.pk,
+                "name": "Pico",
+                "description": "Pico board",
+                "is_ready": True,
+                "pins_configuration": VALID_PINS_CONFIGURATION,
+            },
+            "communication_protocol": "",
             "gd_firmware_version": "1.2.3",
             "mp_firmware_version": "1.21.0",
             "need_upgrade": False,
@@ -347,13 +394,14 @@ class TestDeviceDetailReadOnlySerializer:
         ser_data.pop("last_seen")  # Remove last_seen for comparison
         assert ser_data == expected_data
 
-    def test_serialize_device_without_description(self, mock_serial_ports, status_device):
+    def test_serialize_device_without_description(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         device = Device.objects.create(
             name="Garden Sensor",
             uid="12AB34567890DEAD",
             path="/dev/ttyUSB0",
             status=status_device,
+            category=device_category,
         )
         expected_data = {
             "id": device.pk,
@@ -368,6 +416,14 @@ class TestDeviceDetailReadOnlySerializer:
                 "tag": "device-active",
                 "color": "#00FF00",
             },
+            "category": {
+                "id": device_category.pk,
+                "name": "Pico",
+                "description": "Pico board",
+                "is_ready": True,
+                "pins_configuration": VALID_PINS_CONFIGURATION,
+            },
+            "communication_protocol": "",
             "gd_firmware_version": "",
             "mp_firmware_version": "",
             "need_upgrade": False,
@@ -381,3 +437,173 @@ class TestDeviceDetailReadOnlySerializer:
         assert "last_seen" in ser_data
         ser_data.pop("last_seen")  # Remove last_seen for comparison
         assert ser_data == expected_data
+
+
+VALID_PINS_CONFIGURATION = {
+    "available_channels": ["digit"],
+    "digits": [{"name": "GP0", "pins": [0]}],
+    "pwms": [],
+    "analogs": [],
+}
+
+
+@pytest.fixture
+def device_category(db):
+    return DeviceCategory.objects.create(
+        name="Pico", description="Pico board", pins_configuration=VALID_PINS_CONFIGURATION
+    )
+
+
+@pytest.mark.django_db
+class TestDeviceCategorySerializer:
+
+    def test_create_device_category(self):
+        """Valid data creates a category."""
+        # GIVEN
+        data = {"name": "Pico", "description": "Pico board", "pins_configuration": VALID_PINS_CONFIGURATION}
+        serializer = DeviceCategorySerializer(data=data)
+
+        # WHEN
+        assert serializer.is_valid(), serializer.errors
+        category = serializer.save()
+
+        # THEN
+        assert category.pk is not None
+        assert category.name == "Pico"
+        assert category.description == "Pico board"
+        assert category.pins_configuration == VALID_PINS_CONFIGURATION
+        assert category.is_ready is True
+
+    def test_description_is_optional(self):
+        """The description can be omitted."""
+        # GIVEN
+        serializer = DeviceCategorySerializer(data={"name": "Pico", "pins_configuration": VALID_PINS_CONFIGURATION})
+
+        # WHEN / THEN
+        assert serializer.is_valid(), serializer.errors
+
+    def test_name_is_required(self):
+        """A category without name is refused."""
+        # GIVEN
+        serializer = DeviceCategorySerializer(data={"pins_configuration": VALID_PINS_CONFIGURATION})
+
+        # WHEN / THEN
+        assert not serializer.is_valid()
+        assert "name" in serializer.errors
+
+    def test_invalid_pins_configuration(self):
+        """A pins_configuration that does not match the schema is refused on this field."""
+        # GIVEN
+        data = {"name": "Pico", "pins_configuration": {"available_channels": ["digit"]}}
+        serializer = DeviceCategorySerializer(data=data)
+
+        # WHEN / THEN
+        assert not serializer.is_valid()
+        assert "pins_configuration" in serializer.errors
+
+    def test_missing_pins_configuration_is_refused(self):
+        """pins_configuration is required."""
+        # GIVEN
+        serializer = DeviceCategorySerializer(data={"name": "Pico"})
+
+        # WHEN / THEN
+        assert not serializer.is_valid()
+        assert "pins_configuration" in serializer.errors
+
+    def test_is_ready_is_read_only(self):
+        """is_ready sent by the client is ignored."""
+        # GIVEN
+        data = {"name": "Pico", "pins_configuration": VALID_PINS_CONFIGURATION, "is_ready": False}
+        serializer = DeviceCategorySerializer(data=data)
+
+        # WHEN
+        assert serializer.is_valid(), serializer.errors
+        category = serializer.save()
+
+        # THEN
+        assert category.is_ready is True
+
+    def test_update_device_category(self, device_category):
+        """An update changes the fields of the category."""
+        # GIVEN
+        new_cfg = {**VALID_PINS_CONFIGURATION, "analogs": [{"name": "ADC0", "pins": [26]}]}
+        data = {"name": "Pico W", "description": "", "pins_configuration": new_cfg}
+        serializer = DeviceCategorySerializer(instance=device_category, data=data)
+
+        # WHEN
+        assert serializer.is_valid(), serializer.errors
+        serializer.save()
+
+        # THEN
+        device_category.refresh_from_db()
+        assert device_category.name == "Pico W"
+        assert device_category.description == ""
+        assert device_category.pins_configuration == new_cfg
+
+
+@pytest.mark.django_db
+class TestDeviceCategoryReadOnlySerializers:
+
+    def test_list_serializer_hides_pins_configuration(self, device_category):
+        """The list serializer does not expose pins_configuration."""
+        # WHEN
+        data = DeviceCategoryListReadOnlySerializer(device_category).data
+
+        # THEN
+        assert "pins_configuration" not in data
+        assert data["id"] == device_category.pk
+        assert data["name"] == "Pico"
+        assert data["description"] == "Pico board"
+        assert data["is_ready"] is True
+
+    def test_detail_serializer_exposes_pins_configuration(self, device_category):
+        """The detail serializer exposes pins_configuration."""
+        # WHEN
+        data = DeviceCategoryDetailReadOnlySerializer(device_category).data
+
+        # THEN
+        assert data["name"] == "Pico"
+        assert data["pins_configuration"] == VALID_PINS_CONFIGURATION
+
+    @pytest.mark.parametrize(
+        "serializer_class", [DeviceCategoryListReadOnlySerializer, DeviceCategoryDetailReadOnlySerializer]
+    )
+    def test_read_only_serializers_cannot_save(self, serializer_class, device_category):
+        """The read-only serializers refuse to create or update."""
+        # GIVEN
+        data = {"name": "Other", "pins_configuration": VALID_PINS_CONFIGURATION}
+        serializer = serializer_class(instance=device_category, data=data)
+        serializer.is_valid()
+
+        # WHEN / THEN
+        with pytest.raises(NotImplementedError):
+            serializer.save()
+
+
+@pytest.mark.django_db
+class TestDeviceCategorySeederSerializer:
+
+    def test_create_with_seed_fields(self):
+        """The seeder serializer writes seed_id and is_ready."""
+        # GIVEN
+        data = {"seed_id": "3", "is_ready": False, "name": "Pico", "pins_configuration": VALID_PINS_CONFIGURATION}
+        serializer = DeviceCategorySeederSerializer(data=data)
+
+        # WHEN
+        assert serializer.is_valid(), serializer.errors
+        category = serializer.save()
+
+        # THEN
+        assert category.seed_id == 3
+        assert category.is_ready is False
+
+    def test_seed_id_is_required(self):
+        """The seeder serializer requires a seed_id."""
+        # GIVEN
+        serializer = DeviceCategorySeederSerializer(
+            data={"name": "Pico", "pins_configuration": VALID_PINS_CONFIGURATION}
+        )
+
+        # WHEN / THEN
+        assert not serializer.is_valid()
+        assert "seed_id" in serializer.errors

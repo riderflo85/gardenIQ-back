@@ -23,7 +23,6 @@ class DeviceCategory(SeederMixinModel, NameMixinModel, OptionalDescriptionMixinM
     """
 
     pins_configuration = models.JSONField(
-        default=dict,
         verbose_name="pins configuration",
         help_text="JSON object describing the pins configuration of this device category.",
     )

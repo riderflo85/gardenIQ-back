@@ -32,7 +32,7 @@ class DeviceCategorySerializer(
     OptionalDescriptionMixinSerializer,
     SeederIsReadyMixinSerializer,
 ):
-    pins_configuration = serializers.JSONField(default=dict)
+    pins_configuration = serializers.JSONField()
     # Override is_ready field to be read-only and default to True
     is_ready = serializers.BooleanField(read_only=True, default=True)
 

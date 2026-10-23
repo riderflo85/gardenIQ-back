@@ -9,6 +9,9 @@ from gardeniq.hardware.serializers import DeviceSerializer
 
 
 class DeviceCategoryAPIModelView(BaseAPIModelViewSet):
+    # TODO: Ticket TK-79 (backlog n°4) : supprimer une catégorie utilisée par un device lève une
+    # `ProtectedError` (`Device.category` en `on_delete=PROTECT`) non gérée, donc une erreur 500.
+    # Bien vérifier ce comportement lors du traitement du ticket (réponse 409 attendue et test de vue).
     serializer_class = DeviceCategorySerializer
     list_serializer_class = DeviceCategoryListReadOnlySerializer
     detail_serializer_class = DeviceCategoryDetailReadOnlySerializer

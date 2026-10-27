@@ -71,6 +71,20 @@ class TestFrameModel:
         # WHEN / THEN
         assert frame.verify_checksum() is False
 
+    def test_build_checksum_depends_on_byte_order(self):
+        """Two frames with the same bytes in a different order must not share a checksum."""
+        # GIVEN
+        data = b"< CMD UID 12 get_temp >"
+        reordered = b"< CMD UID 12 get_pmet >"
+        assert sorted(data) == sorted(reordered)
+
+        # WHEN
+        checksum = Frame.build_checksum(data)
+        reordered_checksum = Frame.build_checksum(reordered)
+
+        # THEN
+        assert checksum != reordered_checksum
+
     def test_is_ping_response_detects_device_versions(self, device_frame_factory):
         # GIVEN
         frame = Frame(**device_frame_factory())

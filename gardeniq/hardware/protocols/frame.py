@@ -104,7 +104,7 @@ class Frame:
         sum2 = 0
         for b in data:
             sum1 = (sum1 + b) % 255
-            sum2 = (sum2 + sum2) % 255
+            sum2 = (sum2 + sum1) % 255
         return ((sum2 << 4) ^ sum1) & 0xFF
 
     def verify_checksum(self) -> bool:

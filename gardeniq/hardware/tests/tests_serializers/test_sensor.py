@@ -203,6 +203,7 @@ class TestSensorCategorySerializer:
         # THEN
         assert not serializer.is_valid()
         assert "pin_init_cfg" in serializer.errors
+        assert serializer.errors["pin_init_cfg"][0].startswith("Failed validation JSON schema")
 
     def test_missing_pin_init_cfg(self):
         """

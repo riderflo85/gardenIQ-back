@@ -113,6 +113,7 @@ class TestControllerCategoryAPIModelView(ControllerCategoryViewSetTestConf):
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
         assert "pin_init_cfg" in response.data
+        assert response.data["pin_init_cfg"][0].startswith("Failed validation JSON schema")
         assert not ControllerCategory.objects.filter(name=payload["name"]).exists()
 
     def test_update_with_invalid_pin_init_cfg(self, authenticated_client, obj):

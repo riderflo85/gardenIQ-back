@@ -17,6 +17,19 @@ class PinInitConfigMixin(models.Model):
     class Meta:
         abstract = True
 
+    def clean(self) -> None:
+        """
+        Validate the pin_init_cfg JSON field against the PIN_INIT_CONFIG_JSON_SCHEMA during `full_clean()`,
+        so that model forms (Django admin) display the error on the field instead of failing in `save()`.
+
+        Raises:
+            ValidationError: If the pin_init_cfg does not conform to the schema.
+        """
+        super().clean()
+        # None means the form has already reported the field as missing or malformed.
+        if self.pin_init_cfg is not None:
+            jsonschema_validation(self.pin_init_cfg, settings.PIN_INIT_CONFIG_JSON_SCHEMA, "pin_init_cfg")
+
     def save(self, *args, **kwargs) -> None:
         """
         Override the save method to validate the pin_init_cfg JSON field against

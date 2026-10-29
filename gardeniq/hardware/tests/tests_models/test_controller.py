@@ -206,6 +206,20 @@ class TestControllerCategoryPinInitCfg:
         assert "pin_init_cfg" in exc_info.value.message_dict
         assert ControllerCategory.objects.count() == 0
 
+    def test_full_clean_rejects_invalid_pin_init_cfg(self):
+        """
+        GIVEN: an unsaved ControllerCategory with an invalid pin_init_cfg
+        WHEN: calling full_clean(), as model forms (Django admin) do
+        THEN: a ValidationError is raised on the pin_init_cfg field only
+        """
+        # GIVEN
+        category = ControllerCategory(name="Relay", pin_init_cfg={"c": "Pin", "a": {"id": 4}})
+
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc_info:
+            category.full_clean()
+        assert list(exc_info.value.message_dict) == ["pin_init_cfg"]
+
     def test_save_rejects_invalid_pin_init_cfg_on_update(self, controller_category):
         """
         GIVEN: an existing ControllerCategory

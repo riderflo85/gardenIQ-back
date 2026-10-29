@@ -601,6 +601,7 @@ class TestDeviceCategoryAPIModelView(DeviceCategoryViewSetTestConf):
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "pins_configuration" in response.data
+        assert response.data["pins_configuration"][0].startswith("Failed validation JSON schema")
         assert DeviceCategory.objects.count() == 0
 
     def test_create_without_name(self, authenticated_client):

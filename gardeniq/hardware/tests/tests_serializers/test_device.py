@@ -500,6 +500,7 @@ class TestDeviceCategorySerializer:
         # WHEN / THEN
         assert not serializer.is_valid()
         assert "pins_configuration" in serializer.errors
+        assert serializer.errors["pins_configuration"][0].startswith("Failed validation JSON schema")
 
     def test_missing_pins_configuration_is_refused(self):
         """pins_configuration is required."""

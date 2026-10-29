@@ -50,7 +50,7 @@ class DeviceCategorySerializer(
             jsonschema_validation(value, settings.DATASHEET_JSON_SCHEMA, "pins_configuration")
         except DjangoValidationError as e:
             # Convert Django ValidationError to DRF ValidationError.
-            raise serializers.ValidationError(e.message_dict)
+            raise serializers.ValidationError(e.messages)
         return value
 
 

@@ -210,6 +210,16 @@ class TestDeviceCategoryModel:
         device_category.refresh_from_db()
         assert device_category.pins_configuration == VALID_PINS_CONFIGURATION
 
+    def test_full_clean_rejects_invalid_pins_configuration(self, db):
+        """full_clean() reports an invalid pins_configuration on this field, as model forms (admin) need."""
+        # GIVEN
+        category = DeviceCategory(name="Bad", pins_configuration={"available_channels": "digit"})
+
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc_info:
+            category.full_clean()
+        assert list(exc_info.value.message_dict) == ["pins_configuration"]
+
     def test_delete_protected_when_used_by_device(self, device_category, device_status):
         """A category used by a device cannot be deleted (on_delete=PROTECT)."""
         # GIVEN

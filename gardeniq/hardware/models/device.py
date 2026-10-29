@@ -34,6 +34,19 @@ class DeviceCategory(SeederMixinModel, NameMixinModel, OptionalDescriptionMixinM
     def __str__(self) -> str:
         return f"DeviceCategory `{self.name}`"
 
+    def clean(self) -> None:
+        """
+        Validate the pins_configuration JSON field against the DATASHEET_JSON_SCHEMA during `full_clean()`,
+        so that model forms (Django admin) display the error on the field instead of failing in `save()`.
+
+        Raises:
+            ValidationError: If the pins_configuration does not conform to the schema.
+        """
+        super().clean()
+        # None means the form has already reported the field as missing or malformed.
+        if self.pins_configuration is not None:
+            jsonschema_validation(self.pins_configuration, settings.DATASHEET_JSON_SCHEMA, "pins_configuration")
+
     def save(self, *args, **kwargs) -> None:
         """
         Override the save method to validate the pins_configuration JSON field against

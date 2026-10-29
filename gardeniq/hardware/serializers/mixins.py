@@ -21,5 +21,5 @@ class PinInitConfigMixinSerializer(serializers.Serializer):
             jsonschema_validation(value, settings.PIN_INIT_CONFIG_JSON_SCHEMA, "pin_init_cfg")
         except DjangoValidationError as e:
             # Convert Django ValidationError to DRF ValidationError.
-            raise serializers.ValidationError(e.message_dict)
+            raise serializers.ValidationError(e.messages)
         return value

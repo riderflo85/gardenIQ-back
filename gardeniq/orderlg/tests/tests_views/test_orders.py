@@ -71,7 +71,6 @@ class OrderViewSetTestConf(ViewSetTestMixin):
         return Sensor.objects.create(
             name="Main Temp Sensor",
             category=sensor_category,
-            device=device,
             pin=pin,
         )
 
@@ -84,7 +83,6 @@ class OrderViewSetTestConf(ViewSetTestMixin):
         return Controller.objects.create(
             name="Main Relay",
             category=controller_category,
-            device=device,
             pin=pin2,
         )
 

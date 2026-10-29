@@ -1,5 +1,8 @@
+from django_filters.rest_framework import DjangoFilterBackend
+
 from gardeniq.base.views import BaseAPIModelViewSet
 from gardeniq.base.views.base import READ_ONLY_HTTP_METHODS
+from gardeniq.hardware.filters import PinFilter
 from gardeniq.hardware.models import Channel
 from gardeniq.hardware.models import Pin
 from gardeniq.hardware.serializers import ChannelReadOnlySerializer
@@ -37,6 +40,8 @@ class PinAPIModelView(BaseAPIModelViewSet):
     list_serializer_class = PinMinimalReadOnlySerializer
     detail_serializer_class = PinDetailReadOnlySerializer
     queryset = Pin.objects.all()
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = PinFilter
     http_method_names = READ_ONLY_HTTP_METHODS
 
     def get_queryset(self):

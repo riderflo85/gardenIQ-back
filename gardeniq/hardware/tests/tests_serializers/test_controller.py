@@ -7,6 +7,8 @@ from gardeniq.hardware.models import ControllerCategory
 from gardeniq.hardware.models import Device
 from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
+from gardeniq.hardware.models import Sensor
+from gardeniq.hardware.models import SensorCategory
 from gardeniq.hardware.serializers import ControllerCategoryDetailReadOnlySerializer
 from gardeniq.hardware.serializers import ControllerCategoryListReadOnlySerializer
 from gardeniq.hardware.serializers import ControllerCategorySeederSerializer
@@ -78,7 +80,6 @@ def controller(controller_category, device, pin):
     return Controller.objects.create(
         name="Main Relay",
         category=controller_category,
-        device=device,
         pin=pin,
     )
 
@@ -405,13 +406,11 @@ class TestControllerSerializer:
         data = {
             "name": "Main Relay",
             "category": controller_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
         expected = {
             "name": "Main Relay",
             "category": controller_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
 
@@ -432,7 +431,6 @@ class TestControllerSerializer:
         data = {
             "name": "Main Relay",
             "category": controller_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
 
@@ -446,7 +444,7 @@ class TestControllerSerializer:
         assert Controller.objects.count() == 1
         assert ctrl.name == data["name"]
         assert ctrl.category == controller_category
-        assert ctrl.device == device
+        assert ctrl.pin.device == device
         assert ctrl.pin == pin
 
     def test_update(self, controller, device, channel):
@@ -461,7 +459,6 @@ class TestControllerSerializer:
         updated_data = {
             "name": "Updated Relay",
             "category": new_category.pk,
-            "device": device.pk,
             "pin": new_pin.pk,
         }
 
@@ -488,7 +485,6 @@ class TestControllerSerializer:
             "id": controller.pk,
             "name": controller.name,
             "category": controller_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
 
@@ -517,7 +513,6 @@ class TestControllerListReadOnlySerializer:
         data = {
             "name": "Main Relay",
             "category": controller_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
 
@@ -541,7 +536,6 @@ class TestControllerListReadOnlySerializer:
         data = {
             "name": "Updated Relay",
             "category": controller_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
 
@@ -606,7 +600,6 @@ class TestControllerListReadOnlySerializer:
         second_ctrl = Controller.objects.create(
             name="Second Relay",
             category=controller_category,
-            device=device,
             pin=second_pin,
         )
         queryset = Controller.objects.order_by("pk")
@@ -639,7 +632,6 @@ class TestControllerDetailReadOnlySerializer:
         data = {
             "name": "Main Relay",
             "category": controller_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
 
@@ -717,3 +709,77 @@ class TestControllerDetailReadOnlySerializer:
                 "color": device_status.color,
             },
         }
+
+
+# ─── Pin owner ────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestControllerSerializerPin:
+    """Tests for the pin validation of ControllerSerializer."""
+
+    def test_rejects_pin_used_by_another_controller(self, controller, controller_category, pin):
+        """
+        GIVEN: a Pin already used by a Controller
+        WHEN: validating a new Controller on the same Pin
+        THEN: the serializer is invalid with a flat error list on pin
+        """
+        # GIVEN
+        data = {"name": "Second", "category": controller_category.pk, "pin": pin.pk}
+
+        # WHEN
+        serializer = ControllerSerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert list(serializer.errors) == ["pin"]
+        assert serializer.errors["pin"][0] == "Pin 1 is already used by a controller."
+
+    def test_rejects_pin_used_by_a_sensor(self, controller_category, pin):
+        """
+        GIVEN: a Pin already used by a Sensor
+        WHEN: validating a Controller on the same Pin
+        THEN: the serializer is invalid on pin
+        """
+        # GIVEN
+        other_category = SensorCategory.objects.create(name="Other", pin_init_cfg=VALID_PIN_INIT_CFG)
+        Sensor.objects.create(name="Other owner", category=other_category, pin=pin)
+        data = {"name": "Controller", "category": controller_category.pk, "pin": pin.pk}
+
+        # WHEN
+        serializer = ControllerSerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert serializer.errors["pin"][0] == "Pin 1 is already used by a sensor."
+
+    def test_update_keeps_its_own_pin(self, controller, controller_category, pin):
+        """
+        GIVEN: an existing Controller
+        WHEN: updating it with its own Pin
+        THEN: the serializer is valid
+        """
+        # GIVEN
+        data = {"name": "Renamed", "category": controller_category.pk, "pin": pin.pk}
+
+        # WHEN
+        serializer = ControllerSerializer(instance=controller, data=data)
+
+        # THEN
+        assert serializer.is_valid(), serializer.errors
+
+    def test_device_is_not_writable(self, controller_category, pin):
+        """
+        GIVEN: a payload with a device key
+        WHEN: validating it
+        THEN: the device key is ignored, the device comes from the pin
+        """
+        # GIVEN
+        data = {"name": "Controller", "category": controller_category.pk, "pin": pin.pk, "device": 999}
+
+        # WHEN
+        serializer = ControllerSerializer(data=data)
+
+        # THEN
+        assert serializer.is_valid(), serializer.errors
+        assert "device" not in serializer.validated_data

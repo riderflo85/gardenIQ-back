@@ -73,3 +73,14 @@ class TestJSONFieldsAdmin:
         # THEN
         assert response.status_code == 302
         assert ControllerCategory.objects.get(name="Relay").pin_init_cfg == {"c": "Pin", "a": {"id": "@pin"}}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("model_name", ["sensor", "controller"])
+def test_pin_owner_changelist_shows_and_filters_by_device(admin_client, model_name):
+    """The sensor and controller changelists read the device from the pin."""
+    # WHEN
+    response = admin_client.get(f"/admin/hardware/{model_name}/", {"pin__device__id__exact": 1})
+
+    # THEN
+    assert response.status_code == 200

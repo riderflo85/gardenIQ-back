@@ -170,15 +170,15 @@ class SensorCategoryAdmin(JSONHelpTextAdminMixin, admin.ModelAdmin):
 class SensorAdmin(admin.ModelAdmin):
     """Admin interface for the Sensor model."""
 
-    list_display = ("id", "name", "category", "device", "pin")
+    list_display = ("id", "name", "category", "pin__device", "pin")
     search_fields = ("name",)
-    list_filter = ("category", "device")
+    list_filter = ("category", "pin__device")
 
 
 @admin.register(Controller)
 class ControllerAdmin(admin.ModelAdmin):
     """Admin interface for the Controller model."""
 
-    list_display = ("id", "name", "category", "device", "pin")
+    list_display = ("id", "name", "category", "pin__device", "pin")
     search_fields = ("name",)
-    list_filter = ("category", "device")
+    list_filter = ("category", "pin__device")

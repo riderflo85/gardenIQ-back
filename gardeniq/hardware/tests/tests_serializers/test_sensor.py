@@ -2,6 +2,8 @@ import pytest
 
 from gardeniq.base.models import Status
 from gardeniq.hardware.models import Channel
+from gardeniq.hardware.models import Controller
+from gardeniq.hardware.models import ControllerCategory
 from gardeniq.hardware.models import Device
 from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
@@ -78,7 +80,6 @@ def sensor(sensor_category, device, pin):
     return Sensor.objects.create(
         name="Main Temp Sensor",
         category=sensor_category,
-        device=device,
         pin=pin,
     )
 
@@ -421,13 +422,11 @@ class TestSensorSerializer:
         data = {
             "name": "Main Temp Sensor",
             "category": sensor_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
         expected = {
             "name": "Main Temp Sensor",
             "category": sensor_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
 
@@ -448,7 +447,6 @@ class TestSensorSerializer:
         data = {
             "name": "Main Temp Sensor",
             "category": sensor_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
 
@@ -462,7 +460,7 @@ class TestSensorSerializer:
         assert Sensor.objects.count() == 1
         assert s.name == data["name"]
         assert s.category == sensor_category
-        assert s.device == device
+        assert s.pin.device == device
         assert s.pin == pin
 
     def test_update(self, sensor, device, channel):
@@ -477,7 +475,6 @@ class TestSensorSerializer:
         updated_data = {
             "name": "Updated Temp Sensor",
             "category": new_category.pk,
-            "device": device.pk,
             "pin": new_pin.pk,
         }
 
@@ -504,7 +501,6 @@ class TestSensorSerializer:
             "id": sensor.pk,
             "name": sensor.name,
             "category": sensor_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
 
@@ -533,7 +529,6 @@ class TestSensorListReadOnlySerializer:
         data = {
             "name": "Main Temp Sensor",
             "category": sensor_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
 
@@ -557,7 +552,6 @@ class TestSensorListReadOnlySerializer:
         data = {
             "name": "Updated Temp Sensor",
             "category": sensor_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
 
@@ -622,7 +616,6 @@ class TestSensorListReadOnlySerializer:
         second_sensor = Sensor.objects.create(
             name="Humidity Sensor",
             category=sensor_category,
-            device=device,
             pin=second_pin,
         )
         queryset = Sensor.objects.order_by("pk")
@@ -655,7 +648,6 @@ class TestSensorDetailReadOnlySerializer:
         data = {
             "name": "Main Temp Sensor",
             "category": sensor_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
 
@@ -737,3 +729,77 @@ class TestSensorDetailReadOnlySerializer:
                 "color": device_status.color,
             },
         }
+
+
+# ─── Pin owner ────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestSensorSerializerPin:
+    """Tests for the pin validation of SensorSerializer."""
+
+    def test_rejects_pin_used_by_another_sensor(self, sensor, sensor_category, pin):
+        """
+        GIVEN: a Pin already used by a Sensor
+        WHEN: validating a new Sensor on the same Pin
+        THEN: the serializer is invalid with a flat error list on pin
+        """
+        # GIVEN
+        data = {"name": "Second", "category": sensor_category.pk, "pin": pin.pk}
+
+        # WHEN
+        serializer = SensorSerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert list(serializer.errors) == ["pin"]
+        assert serializer.errors["pin"][0] == "Pin 1 is already used by a sensor."
+
+    def test_rejects_pin_used_by_a_controller(self, sensor_category, pin):
+        """
+        GIVEN: a Pin already used by a Controller
+        WHEN: validating a Sensor on the same Pin
+        THEN: the serializer is invalid on pin
+        """
+        # GIVEN
+        other_category = ControllerCategory.objects.create(name="Other", pin_init_cfg=VALID_PIN_INIT_CFG)
+        Controller.objects.create(name="Other owner", category=other_category, pin=pin)
+        data = {"name": "Sensor", "category": sensor_category.pk, "pin": pin.pk}
+
+        # WHEN
+        serializer = SensorSerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert serializer.errors["pin"][0] == "Pin 1 is already used by a controller."
+
+    def test_update_keeps_its_own_pin(self, sensor, sensor_category, pin):
+        """
+        GIVEN: an existing Sensor
+        WHEN: updating it with its own Pin
+        THEN: the serializer is valid
+        """
+        # GIVEN
+        data = {"name": "Renamed", "category": sensor_category.pk, "pin": pin.pk}
+
+        # WHEN
+        serializer = SensorSerializer(instance=sensor, data=data)
+
+        # THEN
+        assert serializer.is_valid(), serializer.errors
+
+    def test_device_is_not_writable(self, sensor_category, pin):
+        """
+        GIVEN: a payload with a device key
+        WHEN: validating it
+        THEN: the device key is ignored, the device comes from the pin
+        """
+        # GIVEN
+        data = {"name": "Sensor", "category": sensor_category.pk, "pin": pin.pk, "device": 999}
+
+        # WHEN
+        serializer = SensorSerializer(data=data)
+
+        # THEN
+        assert serializer.is_valid(), serializer.errors
+        assert "device" not in serializer.validated_data

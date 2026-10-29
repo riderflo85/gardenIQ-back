@@ -3,6 +3,8 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 
 from rest_framework import serializers
 
+from gardeniq.hardware.models import Pin
+from gardeniq.hardware.models.mixins import PinOwnerMixin
 from gardeniq.hardware.validations import jsonschema_validation
 
 
@@ -22,4 +24,22 @@ class PinInitConfigMixinSerializer(serializers.Serializer):
         except DjangoValidationError as e:
             # Convert Django ValidationError to DRF ValidationError.
             raise serializers.ValidationError(e.messages)
+        return value
+
+
+class PinOwnerMixinSerializer(serializers.Serializer):
+
+    pin = serializers.PrimaryKeyRelatedField(queryset=Pin.objects.all())
+
+    def validate_pin(self, value: Pin) -> Pin:
+        """
+        Refuse a pin already used by a sensor or a controller other than the instance being updated.
+
+        Args:
+            value (Pin): The pin to wire the object to.
+        """
+        for owner in PinOwnerMixin.PIN_OWNERS:
+            current = getattr(value, owner, None)
+            if current is not None and current != self.instance:
+                raise serializers.ValidationError([f"Pin {value.pin_number} is already used by a {owner}."])
         return value

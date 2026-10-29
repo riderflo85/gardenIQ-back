@@ -1,4 +1,7 @@
+from django_filters.rest_framework import DjangoFilterBackend
+
 from gardeniq.base.views import BaseAPIModelViewSet
+from gardeniq.hardware.filters import SensorFilter
 from gardeniq.hardware.models import Sensor
 from gardeniq.hardware.models import SensorCategory
 from gardeniq.hardware.serializers import SensorCategoryDetailReadOnlySerializer
@@ -21,14 +24,15 @@ class SensorAPIModelView(BaseAPIModelViewSet):
     list_serializer_class = SensorListReadOnlySerializer
     detail_serializer_class = SensorDetailReadOnlySerializer
     queryset = Sensor.objects.all()
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = SensorFilter
 
     def get_queryset(self):
         qs = super().get_queryset()
         if self.action in ("list", "retrieve"):
             qs = qs.select_related(
                 "category",
-                "device",
-                "device__status",
-                "pin",
+                "pin__device",
+                "pin__device__status",
             )
         return qs

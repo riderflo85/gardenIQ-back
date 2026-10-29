@@ -8,12 +8,11 @@ from gardeniq.base.serializers import SeederIsReadyMixinSerializer
 from gardeniq.base.serializers import SeederMixinSerializer
 from gardeniq.hardware.models import Controller
 from gardeniq.hardware.models import ControllerCategory
-from gardeniq.hardware.models import Device
-from gardeniq.hardware.models import Pin
 
 from .device import DeviceDetailReadOnlySerializer
 from .device import DeviceMinimalReadOnlySerializer
 from .mixins import PinInitConfigMixinSerializer
+from .mixins import PinOwnerMixinSerializer
 from .pin import PinMinimalReadOnlySerializer
 
 
@@ -39,10 +38,8 @@ class ControllerCategorySeederSerializer(SeederMixinSerializer, ControllerCatego
     pass
 
 
-class ControllerSerializer(BaseSerializer, NameMixinSerializer):
+class ControllerSerializer(BaseSerializer, NameMixinSerializer, PinOwnerMixinSerializer):
     category = serializers.PrimaryKeyRelatedField(queryset=ControllerCategory.objects.all())
-    device = serializers.PrimaryKeyRelatedField(queryset=Device.objects.all())
-    pin = serializers.PrimaryKeyRelatedField(queryset=Pin.objects.all())
 
     class Meta:
         model = Controller
@@ -50,9 +47,9 @@ class ControllerSerializer(BaseSerializer, NameMixinSerializer):
 
 class ControllerListReadOnlySerializer(ReadOnlySerializer, ControllerSerializer):
     category = MinimalReadOnlySerializer(read_only=True)
-    device = DeviceMinimalReadOnlySerializer(read_only=True)
+    device = DeviceMinimalReadOnlySerializer(source="pin.device", read_only=True)
     pin = PinMinimalReadOnlySerializer(read_only=True)
 
 
 class ControllerDetailReadOnlySerializer(ControllerListReadOnlySerializer):
-    device = DeviceDetailReadOnlySerializer(read_only=True)
+    device = DeviceDetailReadOnlySerializer(source="pin.device", read_only=True)

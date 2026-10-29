@@ -240,13 +240,11 @@ class SensorViewSetTestConf(ViewSetTestMixin):
         sensor1 = Sensor.objects.create(
             name="Sensor 1",
             category=category,
-            device=device,
             pin=pin,
         )
         sensor2 = Sensor.objects.create(
             name="Sensor 2",
             category=category,
-            device=device,
             pin=pin2,
         )
         return sensor1, sensor2
@@ -331,7 +329,6 @@ class TestSensorAPIModelView(SensorViewSetTestConf):
         payload = {
             "name": "New Sensor",
             "category": category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
         url = self.get_url_create()
@@ -343,7 +340,6 @@ class TestSensorAPIModelView(SensorViewSetTestConf):
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["name"] == payload["name"]
         assert response.data["category"] == category.pk
-        assert response.data["device"] == device.pk
         assert response.data["pin"] == pin.pk
         assert Sensor.objects.filter(name=payload["name"]).exists()
 
@@ -360,7 +356,6 @@ class TestSensorAPIModelView(SensorViewSetTestConf):
         update_data = {
             "name": "Updated Sensor",
             "category": new_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
 
@@ -409,3 +404,67 @@ class TestSensorAPIModelView(SensorViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+
+@pytest.mark.django_db
+class TestSensorAPIModelViewPin(SensorViewSetTestConf):
+
+    def test_create_with_used_pin_returns_400(self, authenticated_client, obj, category):
+        """
+        GIVEN: a Pin already used by a Sensor
+        WHEN: sending a POST request with the same Pin
+        THEN: the response is 400 with an error on pin
+        """
+        # GIVEN
+        first, _ = obj
+        payload = {"name": "Duplicate", "category": category.pk, "pin": first.pin.pk}
+
+        # WHEN
+        response = authenticated_client.post(self.get_url_create(), payload, format="json")
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+        assert list(response.data) == ["pin"]
+
+    def test_list_filters_by_device(self, authenticated_client, obj, category, device_status, device_category, channel):
+        """
+        GIVEN: two Sensors on a device and one on another device
+        WHEN: listing with ?device=<other device>
+        THEN: only the Sensor of the other device is returned
+        """
+        # GIVEN
+        other_device = Device.objects.create(
+            name="Other Device",
+            uid="1122334455667788",
+            path="/dev/ttyUSB1",
+            status=device_status,
+            category=device_category,
+        )
+        other_pin = Pin.objects.create(device=other_device, channel_choiced=channel, pin_number=1)
+        other = Sensor.objects.create(name="Other", category=category, pin=other_pin)
+
+        # WHEN
+        response = authenticated_client.get(self.get_url_list(), {"device": other_device.pk})
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+        assert [item["id"] for item in response.data["results"]] == [other.pk]
+
+    def test_list_filters_by_category(self, authenticated_client, obj, category):
+        """
+        GIVEN: two Sensors, one moved to a new category
+        WHEN: listing with ?category=<new category>
+        THEN: only that Sensor is returned
+        """
+        # GIVEN
+        first, _ = obj
+        new_category = SensorCategory.objects.create(name="New", pin_init_cfg=VALID_PIN_INIT_CFG)
+        first.category = new_category
+        first.save()
+
+        # WHEN
+        response = authenticated_client.get(self.get_url_list(), {"category": new_category.pk})
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+        assert [item["id"] for item in response.data["results"]] == [first.pk]

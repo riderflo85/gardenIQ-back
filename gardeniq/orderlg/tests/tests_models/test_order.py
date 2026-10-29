@@ -79,7 +79,6 @@ def sensor(sensor_category, device, pin):
     return Sensor.objects.create(
         name="Main Temp Sensor",
         category=sensor_category,
-        device=device,
         pin=pin,
     )
 
@@ -94,7 +93,6 @@ def controller(controller_category, device, pin2):
     return Controller.objects.create(
         name="Main Relay",
         category=controller_category,
-        device=device,
         pin=pin2,
     )
 

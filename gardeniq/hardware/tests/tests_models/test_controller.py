@@ -1,4 +1,6 @@
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
+from django.db import transaction
 from django.db.models import ProtectedError
 
 import pytest
@@ -10,6 +12,8 @@ from gardeniq.hardware.models import ControllerCategory
 from gardeniq.hardware.models import Device
 from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
+from gardeniq.hardware.models import Sensor
+from gardeniq.hardware.models import SensorCategory
 
 VALID_PIN_INIT_CFG = {"c": "Pin", "a": {"id": "@pin"}}
 
@@ -66,7 +70,6 @@ def controller(controller_category, device, pin):
     return Controller.objects.create(
         name="Main Relay",
         category=controller_category,
-        device=device,
         pin=pin,
     )
 
@@ -320,7 +323,6 @@ class TestControllerCreation:
         ctrl = Controller.objects.create(
             name="Main Relay",
             category=controller_category,
-            device=device,
             pin=pin,
         )
 
@@ -328,7 +330,7 @@ class TestControllerCreation:
         assert ctrl.pk is not None
         assert ctrl.name == "Main Relay"
         assert ctrl.category == controller_category
-        assert ctrl.device == device
+        assert ctrl.pin.device == device
         assert ctrl.pin == pin
 
     def test_create_multiple_controllers_for_same_device(self, controller_category, device, channel):
@@ -342,8 +344,8 @@ class TestControllerCreation:
         pin2 = Pin.objects.create(device=device, channel_choiced=channel, pin_number=3)
 
         # WHEN
-        Controller.objects.create(name="Relay 1", category=controller_category, device=device, pin=pin1)
-        Controller.objects.create(name="Relay 2", category=controller_category, device=device, pin=pin2)
+        Controller.objects.create(name="Relay 1", category=controller_category, pin=pin1)
+        Controller.objects.create(name="Relay 2", category=controller_category, pin=pin2)
 
         # THEN
         assert Controller.objects.count() == 2
@@ -369,14 +371,14 @@ class TestControllerRelations:
 
     def test_device_relation_returns_correct_device(self, controller, device):
         """
-        GIVEN: a Controller linked to a Device
-        WHEN: accessing the device attribute
+        GIVEN: a Controller linked to a Pin of a Device
+        WHEN: accessing the device of its pin
         THEN: the correct Device is returned
         """
-        # GIVEN - fixture creates the Controller with the device
+        # GIVEN - fixture creates the Controller with a pin of the device
 
         # WHEN
-        result = controller.device
+        result = controller.pin.device
 
         # THEN
         assert result == device
@@ -398,13 +400,13 @@ class TestControllerRelations:
     def test_device_reverse_relation_includes_controller(self, controller, device):
         """
         GIVEN: a Controller linked to a Device
-        WHEN: accessing the controllers reverse relation on the Device
+        WHEN: filtering the Controllers by the device of their pin
         THEN: the related Controller is returned
         """
-        # GIVEN - fixture creates the Controller linked to the device
+        # GIVEN - fixture creates the Controller linked to a pin of the device
 
         # WHEN
-        related = device.controllers.all()
+        related = Controller.objects.filter(pin__device=device)
 
         # THEN
         assert related.count() == 1
@@ -413,17 +415,16 @@ class TestControllerRelations:
     def test_pin_reverse_relation_includes_controller(self, controller, pin):
         """
         GIVEN: a Controller linked to a Pin
-        WHEN: accessing the controllers reverse relation on the Pin
+        WHEN: accessing the controller reverse one-to-one relation on the Pin
         THEN: the related Controller is returned
         """
         # GIVEN - fixture creates the Controller linked to the pin
 
         # WHEN
-        related = pin.controllers.all()
+        related = pin.controller
 
         # THEN
-        assert related.count() == 1
-        assert controller in related
+        assert related == controller
 
 
 @pytest.mark.django_db
@@ -592,3 +593,88 @@ class TestControllerDeletion:
 
         # THEN
         assert Pin.objects.filter(pk=pin_id).exists()
+
+
+# ─── Pin owner ────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestControllerPinOwner:
+    """Tests for the rule: a Pin is used by one Sensor or Controller only."""
+
+    @pytest.fixture
+    def other_owner(self, pin):
+        category = SensorCategory.objects.create(name="Other", pin_init_cfg=VALID_PIN_INIT_CFG)
+        return Sensor.objects.create(name="Other owner", category=category, pin=pin)
+
+    def test_save_rejects_pin_used_by_another_controller(self, controller, controller_category, pin):
+        """
+        GIVEN: a Pin already used by a Controller
+        WHEN: creating a second Controller on the same Pin
+        THEN: the database refuses it
+        """
+        # GIVEN - fixture creates the Controller on the pin
+
+        # WHEN / THEN
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Controller.objects.create(name="Second", category=controller_category, pin=pin)
+
+    def test_full_clean_rejects_pin_used_by_another_controller(self, controller, controller_category, pin):
+        """
+        GIVEN: a Pin already used by a Controller
+        WHEN: validating a second Controller on the same Pin
+        THEN: a ValidationError is raised on the pin field
+        """
+        # GIVEN
+        second = Controller(name="Second", category=controller_category, pin=pin)
+
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc:
+            second.full_clean()
+        assert "pin" in exc.value.message_dict
+
+    def test_save_rejects_pin_used_by_a_sensor(self, other_owner, controller_category, pin):
+        """
+        GIVEN: a Pin already used by a Sensor
+        WHEN: creating a Controller on the same Pin
+        THEN: a ValidationError is raised on the pin field and nothing is saved
+        """
+        # GIVEN - fixture creates the Sensor on the pin
+
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc:
+            Controller.objects.create(name="Controller", category=controller_category, pin=pin)
+        assert "pin" in exc.value.message_dict
+        assert Controller.objects.count() == 0
+
+    def test_full_clean_rejects_pin_used_by_a_sensor(self, other_owner, controller_category, pin):
+        """
+        GIVEN: a Pin already used by a Sensor
+        WHEN: validating a Controller on the same Pin
+        THEN: a ValidationError is raised on the pin field
+        """
+        # GIVEN
+        obj = Controller(name="Controller", category=controller_category, pin=pin)
+
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc:
+            obj.full_clean()
+        assert "pin" in exc.value.message_dict
+
+    def test_save_keeps_its_own_pin(self, controller, pin):
+        """
+        GIVEN: an existing Controller
+        WHEN: saving it again without changing its Pin
+        THEN: the save succeeds
+        """
+        # GIVEN
+        controller.name = "Renamed"
+
+        # WHEN
+        controller.full_clean()
+        controller.save()
+
+        # THEN
+        controller.refresh_from_db()
+        assert controller.name == "Renamed"
+        assert controller.pin == pin

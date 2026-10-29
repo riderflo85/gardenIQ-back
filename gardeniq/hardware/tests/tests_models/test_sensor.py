@@ -1,10 +1,14 @@
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
+from django.db import transaction
 from django.db.models import ProtectedError
 
 import pytest
 
 from gardeniq.base.models import Status
 from gardeniq.hardware.models import Channel
+from gardeniq.hardware.models import Controller
+from gardeniq.hardware.models import ControllerCategory
 from gardeniq.hardware.models import Device
 from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
@@ -66,7 +70,6 @@ def sensor(sensor_category, device, pin):
     return Sensor.objects.create(
         name="Main Temp Sensor",
         category=sensor_category,
-        device=device,
         pin=pin,
     )
 
@@ -339,7 +342,6 @@ class TestSensorCreation:
         s = Sensor.objects.create(
             name="Main Temp Sensor",
             category=sensor_category,
-            device=device,
             pin=pin,
         )
 
@@ -347,7 +349,7 @@ class TestSensorCreation:
         assert s.pk is not None
         assert s.name == "Main Temp Sensor"
         assert s.category == sensor_category
-        assert s.device == device
+        assert s.pin.device == device
         assert s.pin == pin
 
     def test_create_multiple_sensors_for_same_device(self, sensor_category, device, channel):
@@ -361,8 +363,8 @@ class TestSensorCreation:
         pin2 = Pin.objects.create(device=device, channel_choiced=channel, pin_number=3)
 
         # WHEN
-        Sensor.objects.create(name="Temp Sensor", category=sensor_category, device=device, pin=pin1)
-        Sensor.objects.create(name="Humidity Sensor", category=sensor_category, device=device, pin=pin2)
+        Sensor.objects.create(name="Temp Sensor", category=sensor_category, pin=pin1)
+        Sensor.objects.create(name="Humidity Sensor", category=sensor_category, pin=pin2)
 
         # THEN
         assert Sensor.objects.count() == 2
@@ -388,14 +390,14 @@ class TestSensorRelations:
 
     def test_device_relation_returns_correct_device(self, sensor, device):
         """
-        GIVEN: a Sensor linked to a Device
-        WHEN: accessing the device attribute
+        GIVEN: a Sensor linked to a Pin of a Device
+        WHEN: accessing the device of its pin
         THEN: the correct Device is returned
         """
-        # GIVEN - fixture creates the Sensor with the device
+        # GIVEN - fixture creates the Sensor with a pin of the device
 
         # WHEN
-        result = sensor.device
+        result = sensor.pin.device
 
         # THEN
         assert result == device
@@ -417,13 +419,13 @@ class TestSensorRelations:
     def test_device_reverse_relation_includes_sensor(self, sensor, device):
         """
         GIVEN: a Sensor linked to a Device
-        WHEN: accessing the sensors reverse relation on the Device
+        WHEN: filtering the Sensors by the device of their pin
         THEN: the related Sensor is returned
         """
-        # GIVEN - fixture creates the Sensor linked to the device
+        # GIVEN - fixture creates the Sensor linked to a pin of the device
 
         # WHEN
-        related = device.sensors.all()
+        related = Sensor.objects.filter(pin__device=device)
 
         # THEN
         assert related.count() == 1
@@ -432,17 +434,16 @@ class TestSensorRelations:
     def test_pin_reverse_relation_includes_sensor(self, sensor, pin):
         """
         GIVEN: a Sensor linked to a Pin
-        WHEN: accessing the sensors reverse relation on the Pin
+        WHEN: accessing the sensor reverse one-to-one relation on the Pin
         THEN: the related Sensor is returned
         """
         # GIVEN - fixture creates the Sensor linked to the pin
 
         # WHEN
-        related = pin.sensors.all()
+        related = pin.sensor
 
         # THEN
-        assert related.count() == 1
-        assert sensor in related
+        assert related == sensor
 
 
 @pytest.mark.django_db
@@ -611,3 +612,88 @@ class TestSensorDeletion:
 
         # THEN
         assert Pin.objects.filter(pk=pin_id).exists()
+
+
+# ─── Pin owner ────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestSensorPinOwner:
+    """Tests for the rule: a Pin is used by one Sensor or Controller only."""
+
+    @pytest.fixture
+    def other_owner(self, pin):
+        category = ControllerCategory.objects.create(name="Other", pin_init_cfg=VALID_PIN_INIT_CFG)
+        return Controller.objects.create(name="Other owner", category=category, pin=pin)
+
+    def test_save_rejects_pin_used_by_another_sensor(self, sensor, sensor_category, pin):
+        """
+        GIVEN: a Pin already used by a Sensor
+        WHEN: creating a second Sensor on the same Pin
+        THEN: the database refuses it
+        """
+        # GIVEN - fixture creates the Sensor on the pin
+
+        # WHEN / THEN
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Sensor.objects.create(name="Second", category=sensor_category, pin=pin)
+
+    def test_full_clean_rejects_pin_used_by_another_sensor(self, sensor, sensor_category, pin):
+        """
+        GIVEN: a Pin already used by a Sensor
+        WHEN: validating a second Sensor on the same Pin
+        THEN: a ValidationError is raised on the pin field
+        """
+        # GIVEN
+        second = Sensor(name="Second", category=sensor_category, pin=pin)
+
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc:
+            second.full_clean()
+        assert "pin" in exc.value.message_dict
+
+    def test_save_rejects_pin_used_by_a_controller(self, other_owner, sensor_category, pin):
+        """
+        GIVEN: a Pin already used by a Controller
+        WHEN: creating a Sensor on the same Pin
+        THEN: a ValidationError is raised on the pin field and nothing is saved
+        """
+        # GIVEN - fixture creates the Controller on the pin
+
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc:
+            Sensor.objects.create(name="Sensor", category=sensor_category, pin=pin)
+        assert "pin" in exc.value.message_dict
+        assert Sensor.objects.count() == 0
+
+    def test_full_clean_rejects_pin_used_by_a_controller(self, other_owner, sensor_category, pin):
+        """
+        GIVEN: a Pin already used by a Controller
+        WHEN: validating a Sensor on the same Pin
+        THEN: a ValidationError is raised on the pin field
+        """
+        # GIVEN
+        obj = Sensor(name="Sensor", category=sensor_category, pin=pin)
+
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc:
+            obj.full_clean()
+        assert "pin" in exc.value.message_dict
+
+    def test_save_keeps_its_own_pin(self, sensor, pin):
+        """
+        GIVEN: an existing Sensor
+        WHEN: saving it again without changing its Pin
+        THEN: the save succeeds
+        """
+        # GIVEN
+        sensor.name = "Renamed"
+
+        # WHEN
+        sensor.full_clean()
+        sensor.save()
+
+        # THEN
+        sensor.refresh_from_db()
+        assert sensor.name == "Renamed"
+        assert sensor.pin == pin

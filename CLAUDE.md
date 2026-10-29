@@ -75,7 +75,7 @@ Hooks : `.git/hooks/pre-commit` est le framework `pre-commit` (`pre-commit insta
 
 La documentation de référence vit dans `docs/features/` et `docs/runbooks/` (Markdown, diagrammes Mermaid).
 
-`docs/modele-de-donnees.md` est le diagramme relationnel de tous les modèles Django. Tout ajout, modification ou suppression d'un modèle, d'un champ ou d'une relation le met à jour dans le même commit.
+`docs/modele-de-donnees.md` est le diagramme relationnel de tous les modèles Django. Tout ajout, modification ou suppression d'un modèle, d'un champ ou d'une relation le met à jour dans le même commit, puis met à jour sa copie Notion « Modèle de données (back) » (dossier « Documentations technique », https://app.notion.com/p/40854287aae081ddbe8bc4931f6c4822) : même contenu, ligne « Dernière vérification » comprise. Le fichier du dépôt est la source ; l'écriture dans Notion se confirme comme toute écriture Notion.
 
 ## Notion (kanban des tickets)
 

@@ -4,7 +4,7 @@ Dernière vérification : 2026-10-29 · 719d8a0
 
 Diagramme relationnel des modèles Django du projet (apps `base`, `hardware`, `orderlg`, `users` ; `telemetry` n'a pas encore de modèle). Il est construit à la lecture de `gardeniq/<app>/models/` : les champs hérités des mixins abstraits de `base/models/mixins.py` sont dépliés dans chaque table, et chaque table a une clé primaire `id` automatique.
 
-**À tenir à jour** : tout ajout, modification ou suppression d'un modèle, d'un champ ou d'une relation dans les modèles Django met ce fichier à jour dans le même commit (règle de `CLAUDE.md`).
+**À tenir à jour** : tout ajout, modification ou suppression d'un modèle, d'un champ ou d'une relation dans les modèles Django met ce fichier à jour dans le même commit, puis sa copie Notion [Modèle de données (back)](https://app.notion.com/p/40854287aae081ddbe8bc4931f6c4822) (règle de `CLAUDE.md`).
 
 ```mermaid
 erDiagram

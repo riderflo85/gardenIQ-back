@@ -74,6 +74,8 @@ Hooks : `.git/hooks/pre-commit` est le framework `pre-commit` (`pre-commit insta
 
 La documentation de référence vit dans `docs/features/` et `docs/runbooks/` (Markdown, diagrammes Mermaid).
 
+`docs/modele-de-donnees.md` est le diagramme relationnel de tous les modèles Django. Tout ajout, modification ou suppression d'un modèle, d'un champ ou d'une relation le met à jour dans le même commit.
+
 ## Notion (kanban des tickets)
 
 Les tickets vivent dans le kanban Notion, accessible par le serveur MCP `notion` (espace « GardenerIQ », compte « Garden » : toute écriture apparaît sous ce compte). Les outils `mcp__notion__*` sont chargés à la demande : `ToolSearch` avec `select:<nom>` avant le premier appel. Skills : `ticket` (lire et traiter un ticket, tenir son statut à jour) et `ticket-create` (créer des tickets à partir de `docs/backlog.md`).

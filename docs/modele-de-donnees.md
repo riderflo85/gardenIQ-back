@@ -1,6 +1,6 @@
 # Modèle de données
 
-Dernière vérification : 2026-10-29 · 719d8a0
+Dernière vérification : 2026-10-29 · commit « (TK-74)(enh) - hardware: Add a seeder for channels » · branche `(TK-74)-Update-device-object`
 
 Diagramme relationnel des modèles Django du projet (apps `base`, `hardware`, `orderlg`, `users` ; `telemetry` n'a pas encore de modèle). Il est construit à la lecture de `gardeniq/<app>/models/` : les champs hérités des mixins abstraits de `base/models/mixins.py` sont dépliés dans chaque table, et chaque table a une clé primaire `id` automatique.
 
@@ -46,6 +46,8 @@ erDiagram
         int id PK
         varchar name
         text description "optionnel"
+        bigint seed_id UK "nullable"
+        bool is_ready
     }
 
     Pin {
@@ -147,7 +149,7 @@ Les tables ci-dessus reçoivent leurs champs communs de ces mixins (`base/models
 |---|---|---|
 | `NameMixinModel` | `name` | toutes les tables du projet sauf `Pin` et `CustomUser` |
 | `OptionalDescriptionMixinModel` / `DescriptionMixinModel` | `description` (optionnelle / obligatoire) | `Status`, `DeviceCategory`, `Device`, `Channel` / `Order` |
-| `SeederMixinModel` | `seed_id`, `is_ready` | `Status`, `DeviceCategory`, `ControllerCategory`, `SensorCategory`, `Order` |
+| `SeederMixinModel` | `seed_id`, `is_ready` | `Status`, `DeviceCategory`, `Channel`, `ControllerCategory`, `SensorCategory`, `Order` |
 | `SlugMixinModel` | `slug` | `Order` |
 | `ProtectedDisabledMixinModel` | `is_enabled` | `Order` |
 | `PinInitConfigMixin` | `pin_init_cfg` | `ControllerCategory`, `SensorCategory` |

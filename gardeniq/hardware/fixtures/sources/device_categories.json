@@ -5,7 +5,7 @@
         "name": "Raspberry PiPico",
         "description": "Carte microcontrôleur Raspberry Pi Pico. Sans wifi ni bluetooth. Basée sur le microcontrôleur RP2040.",
         "pins_configuration": {
-            "available_channels": ["digit", "analog"],
+            "available_channels": ["digit", "analog", "pwm"],
             "digits": [
                 {"name": "GP0", "pins": [0]},
                 {"name": "GP1", "pins": [1]},

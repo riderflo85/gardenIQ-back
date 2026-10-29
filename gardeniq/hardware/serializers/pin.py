@@ -4,6 +4,8 @@ from gardeniq.base.serializers import BaseSerializer
 from gardeniq.base.serializers import NameMixinSerializer
 from gardeniq.base.serializers import OptionalDescriptionMixinSerializer
 from gardeniq.base.serializers import ReadOnlySerializer
+from gardeniq.base.serializers import SeederIsReadyMixinSerializer
+from gardeniq.base.serializers import SeederMixinSerializer
 from gardeniq.base.serializers.mixins import PKMixinSerializer
 from gardeniq.hardware.models import Channel
 from gardeniq.hardware.models import Device
@@ -12,12 +14,24 @@ from gardeniq.hardware.models import Pin
 from .device import DeviceMinimalReadOnlySerializer
 
 
-class ChannelSerializer(BaseSerializer, NameMixinSerializer, OptionalDescriptionMixinSerializer):
+class ChannelSerializer(
+    BaseSerializer,
+    NameMixinSerializer,
+    OptionalDescriptionMixinSerializer,
+    SeederIsReadyMixinSerializer,
+):
+    # Override is_ready field to be read-only and default to True
+    is_ready = serializers.BooleanField(read_only=True, default=True)
+
     class Meta:
         model = Channel
 
 
 class ChannelReadOnlySerializer(ReadOnlySerializer, ChannelSerializer):
+    pass
+
+
+class ChannelSeederSerializer(SeederMixinSerializer, ChannelSerializer):
     pass
 
 

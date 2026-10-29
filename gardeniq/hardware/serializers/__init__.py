@@ -13,6 +13,7 @@ from .device import DeviceDetailReadOnlySerializer
 from .device import DeviceMinimalReadOnlySerializer
 from .device import DeviceSerializer
 from .pin import ChannelReadOnlySerializer
+from .pin import ChannelSeederSerializer
 from .pin import ChannelSerializer
 from .pin import PinDetailReadOnlySerializer
 from .pin import PinMinimalReadOnlySerializer

@@ -46,7 +46,7 @@ class TestDeviceCategorySeeder:
         assert category.name == "Raspberry PiPico"
         assert category.is_ready is True
         assert len(category.pins_configuration["digits"]) == 29
-        assert category.pins_configuration["available_channels"] == ["digit", "analog"]
+        assert category.pins_configuration["available_channels"] == ["digit", "analog", "pwm"]
 
     def test_seed_skips_when_entries_already_exist(self, device_category_seeder, error_logs):
         """A second seed without authorize_update does not create duplicates."""

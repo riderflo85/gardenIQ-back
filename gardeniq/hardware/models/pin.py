@@ -2,15 +2,18 @@ from django.db import models
 
 from gardeniq.base.models import NameMixinModel
 from gardeniq.base.models import OptionalDescriptionMixinModel
+from gardeniq.base.models import SeederMixinModel
 
 from .device import Device
 
 
-class Channel(NameMixinModel, OptionalDescriptionMixinModel):
+class Channel(NameMixinModel, OptionalDescriptionMixinModel, SeederMixinModel):
     """
     Inherited fields:
       - `name`
       - `description`:optional
+      - `seed_id`
+      - `is_ready`
     """
 
     class Meta:

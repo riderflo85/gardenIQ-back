@@ -1,0 +1,38 @@
+[
+    {
+        "seed_id": 1,
+        "is_ready": true,
+        "name": "digit",
+        "description": "Canal numérique (0 ou 1)."
+    },
+    {
+        "seed_id": 2,
+        "is_ready": true,
+        "name": "analog",
+        "description": "Canal analogique (0 à 3.3V)."
+    },
+    {
+        "seed_id": 3,
+        "is_ready": true,
+        "name": "pwm",
+        "description": "Canal PWM (0 à 100%)."
+    },
+    {
+        "seed_id": 4,
+        "is_ready": false,
+        "name": "i2c",
+        "description": "Canal I2C (SDA/SCL)."
+    },
+    {
+        "seed_id": 5,
+        "is_ready": false,
+        "name": "spi",
+        "description": "Canal SPI (MOSI/MISO/SCK/CS)."
+    },
+    {
+        "seed_id": 6,
+        "is_ready": false,
+        "name": "uart",
+        "description": "Canal UART (TX/RX)."
+    }
+]

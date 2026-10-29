@@ -54,6 +54,7 @@ class TestChannelAPIModelView(ChannelViewSetTestConf):
         assert "id" in first
         assert "name" in first
         assert "description" in first
+        assert first["is_ready"] is True
 
     def test_retrieve(self, authenticated_client, obj):
         """

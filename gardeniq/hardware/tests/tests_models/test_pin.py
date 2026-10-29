@@ -1,4 +1,5 @@
 from django.db import IntegrityError
+from django.db import transaction
 from django.db.models import ProtectedError
 
 import pytest
@@ -152,6 +153,37 @@ class TestChannelDescription:
         # THEN
         refreshed = Channel.objects.get(pk=channel.pk)
         assert refreshed.name == new_name
+
+
+@pytest.mark.django_db
+class TestChannelSeederFields:
+    """Tests for the seeder fields of Channel."""
+
+    def test_seeder_fields_defaults(self):
+        """
+        GIVEN: a name for a Channel
+        WHEN: creating it without seeder fields
+        THEN: is_ready defaults to True and seed_id to None
+        """
+        # GIVEN / WHEN
+        channel = Channel.objects.create(name="Digital")
+
+        # THEN
+        assert channel.is_ready is True
+        assert channel.seed_id is None
+
+    def test_seed_id_is_unique(self):
+        """
+        GIVEN: a Channel with a seed_id
+        WHEN: creating another Channel with the same seed_id
+        THEN: the database refuses it
+        """
+        # GIVEN
+        Channel.objects.create(name="digit", seed_id=1)
+
+        # WHEN / THEN
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Channel.objects.create(name="analog", seed_id=1)
 
 
 @pytest.mark.django_db

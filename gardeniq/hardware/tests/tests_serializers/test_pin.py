@@ -6,6 +6,7 @@ from gardeniq.hardware.models import Device
 from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
 from gardeniq.hardware.serializers import ChannelReadOnlySerializer
+from gardeniq.hardware.serializers import ChannelSeederSerializer
 from gardeniq.hardware.serializers import ChannelSerializer
 from gardeniq.hardware.serializers import PinDetailReadOnlySerializer
 from gardeniq.hardware.serializers import PinMinimalReadOnlySerializer
@@ -175,6 +176,7 @@ class TestChannelSerializer:
             "id": channel.pk,
             "name": channel.name,
             "description": channel.description,
+            "is_ready": True,
         }
 
         # WHEN
@@ -182,6 +184,72 @@ class TestChannelSerializer:
 
         # THEN
         assert serializer.data == expected
+
+
+# ─── Channel seeder fields ─────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestChannelSerializerIsReady:
+    """Tests for the is_ready field of ChannelSerializer."""
+
+    def test_is_ready_is_read_only(self):
+        """
+        GIVEN: data with is_ready set to False
+        WHEN: saving through ChannelSerializer
+        THEN: is_ready is ignored and the Channel is ready
+        """
+        # GIVEN
+        data = {"name": "Analog", "is_ready": False}
+
+        # WHEN
+        serializer = ChannelSerializer(data=data)
+        assert serializer.is_valid(), serializer.errors
+        channel = serializer.save()
+
+        # THEN
+        assert channel.is_ready is True
+        assert channel.seed_id is None
+
+
+@pytest.mark.django_db
+class TestChannelSeederSerializer:
+    """Tests for ChannelSeederSerializer (used by the seeder)."""
+
+    def test_create_with_seed_fields(self):
+        """
+        GIVEN: valid data with seed_id and is_ready
+        WHEN: saving through ChannelSeederSerializer
+        THEN: seed_id and is_ready are written
+        """
+        # GIVEN
+        data = {"seed_id": 4, "is_ready": False, "name": "i2c", "description": "Canal I2C."}
+
+        # WHEN
+        serializer = ChannelSeederSerializer(data=data)
+        assert serializer.is_valid(), serializer.errors
+        channel = serializer.save()
+
+        # THEN
+        assert channel.seed_id == 4
+        assert channel.is_ready is False
+        assert channel.description == "Canal I2C."
+
+    def test_seed_id_is_required(self):
+        """
+        GIVEN: data without seed_id
+        WHEN: validating through ChannelSeederSerializer
+        THEN: the serializer is invalid with an error on seed_id
+        """
+        # GIVEN
+        data = {"name": "i2c"}
+
+        # WHEN
+        serializer = ChannelSeederSerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert "seed_id" in serializer.errors
 
 
 # ─── ChannelReadOnlySerializer ─────────────────────────────────────────────────
@@ -241,6 +309,7 @@ class TestChannelReadOnlySerializer:
             "id": channel.pk,
             "name": channel.name,
             "description": channel.description,
+            "is_ready": True,
         }
 
         # WHEN
@@ -413,6 +482,7 @@ class TestPinDetailReadOnlySerializer:
             "id": channel.pk,
             "name": channel.name,
             "description": channel.description,
+            "is_ready": True,
         }
 
     def test_serialized_instance_channels_available(self, pin, channel):
@@ -433,6 +503,7 @@ class TestPinDetailReadOnlySerializer:
             "id": channel.pk,
             "name": channel.name,
             "description": channel.description,
+            "is_ready": True,
         }
 
     def test_serialized_instance_device_field(self, pin, device, device_status):

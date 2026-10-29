@@ -50,6 +50,18 @@ class TestJSONFieldsAdmin:
         assert errors[field][0].startswith("Failed validation JSON schema")
         assert model.objects.count() == 0
 
+    @pytest.mark.parametrize("model, model_name, data, field", ADMIN_CASES)
+    def test_add_form_shows_json_help_text(self, admin_client, model, model_name, data, field):
+        """The add form explains the expected JSON format under the field."""
+        # WHEN
+        response = admin_client.get(f"/admin/hardware/{model_name}/add/")
+
+        # THEN
+        assert response.status_code == 200
+        help_text = response.context["adminform"].form.fields[field].help_text
+        assert "Example" in help_text
+        assert help_text in response.content.decode()
+
     def test_add_with_valid_pin_init_cfg_creates_category(self, admin_client):
         """A valid pin_init_cfg is saved from the admin form."""
         # GIVEN

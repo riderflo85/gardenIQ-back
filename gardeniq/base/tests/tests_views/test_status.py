@@ -347,3 +347,23 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+class TestStatusAPIModelViewFilters(StatusViewSetTestConf):
+
+    def test_list_filters_by_tag(self, authenticated_client, obj):
+        """
+        GIVEN: two Statuses with different tags
+        WHEN: listing with ?tag=<tag of the default Status>
+        THEN: only the default Status is returned
+        """
+        # GIVEN
+        Status.objects.create(name="Other", tag="other-tag")
+
+        # WHEN
+        response = authenticated_client.get(self.get_url_list(), {"tag": obj.tag})
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+        assert [item["id"] for item in response.data["results"]] == [obj.pk]

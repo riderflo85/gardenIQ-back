@@ -677,3 +677,38 @@ class TestDeviceCategoryAPIModelView(DeviceCategoryViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.django_db
+class TestDeviceAPIModelViewFilters(DeviceViewSetTestConf):
+
+    @pytest.fixture
+    def other_device(self):
+        """A Device with another Status and another DeviceCategory."""
+        return Device.objects.create(
+            name="Other Device",
+            uid="1122334455667788",
+            path="/dev/ttyUSB1",
+            status=Status.objects.create(name="Device Offline", tag="device-offline"),
+            category=DeviceCategory.objects.create(
+                name="Other Category",
+                pins_configuration={"available_channels": [], "digits": [], "pwms": [], "analogs": []},
+            ),
+        )
+
+    @pytest.mark.parametrize("field", ["category", "status"])
+    def test_list_filters_by_relation(self, authenticated_client, obj, other_device, field):
+        """
+        GIVEN: two Devices with different categories and statuses
+        WHEN: listing with ?category= or ?status= of the other Device
+        THEN: only the other Device is returned
+        """
+        # GIVEN
+        value = getattr(other_device, field).pk
+
+        # WHEN
+        response = authenticated_client.get(self.get_url_list(), {field: value})
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+        assert [item["id"] for item in response.data["results"]] == [other_device.pk]

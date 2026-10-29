@@ -32,6 +32,7 @@ Les règles à ne jamais enfreindre :
 - Les modules `utils` n'importent ni modèle, ni serializer, ni vue de `gardeniq` en tête de fichier (import dans le corps de la fonction).
 - Chaque app expose ses routes dans `api_urls.py` (router DRF), inclus dans `gardeniq/urls.py` sous `api/`. `ToggleObjectRouter` (`base/routers.py`) ajoute `enable/` et `disable/`.
 - Les vues héritent de `BaseAPIModelViewSet` (`base/views/base.py`) : `serializer_class` (écriture), `detail_serializer_class` (retrieve) et `list_serializer_class` (list, optionnel). `DisableAPIViewMixin` pour enable/disable.
+- Filtres de liste : `FilterAPIViewMixin` (`base/views/mixins.py`, django-filter) en tête des parents de la vue, avec `filterset_fields` pour un filtre simple ou `filterset_class` (FilterSet dans `<app>/filters.py`) pour un champ calculé ou une relation traversée (ex. `?device=` de `/api/sensors/` via `pin__device`).
 - Les serializers héritent de `BaseSerializer` (`base/serializers/bases.py`) avec `Meta.model` et les `*MixinSerializer` de `base/serializers/mixins.py` ; pas de `ModelSerializer`. Lecture seule : `ReadOnlySerializer`.
 - Les modèles réutilisent les mixins abstraits de `base/models/mixins.py` (`Slug`, `Name`, `Description`, `ProtectedDisabled`, `ProtectedDeleted`, `Seeder`…). Les suppressions/désactivations protégées lèvent les exceptions de `base/exceptions.py`.
 - Les erreurs attendues sont gérées explicitement dans la vue ; `APIException` en dernier recours.

@@ -1,4 +1,5 @@
 from gardeniq.base.views import BaseAPIModelViewSet
+from gardeniq.base.views import FilterAPIViewMixin
 from gardeniq.hardware.models import Device
 from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.serializers import DeviceCategoryDetailReadOnlySerializer
@@ -18,10 +19,11 @@ class DeviceCategoryAPIModelView(BaseAPIModelViewSet):
     queryset = DeviceCategory.objects.all()
 
 
-class DeviceAPIModelView(BaseAPIModelViewSet):
+class DeviceAPIModelView(FilterAPIViewMixin, BaseAPIModelViewSet):
     serializer_class = DeviceSerializer
     detail_serializer_class = DeviceDetailReadOnlySerializer
     queryset = Device.objects.all()
+    filterset_fields = ["category", "status"]
 
     def get_queryset(self):
         qs = super().get_queryset()

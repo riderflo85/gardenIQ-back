@@ -350,3 +350,42 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+
+@pytest.mark.django_db
+class TestOrderAPIModelViewFilters(OrderViewSetTestConf):
+
+    @pytest.mark.parametrize("field, expected_index", [("action_type", 0), ("sensor", 0), ("controller", 1)])
+    def test_list_filters(self, authenticated_client, obj, field, expected_index):
+        """
+        GIVEN: a getter Order on a Sensor and a setter Order on a Controller
+        WHEN: listing with ?<field>= of one of them
+        THEN: only that Order is returned
+        """
+        # GIVEN
+        expected = obj[expected_index]
+        value = getattr(expected, field)
+
+        # WHEN
+        response = authenticated_client.get(self.get_url_list(), {field: getattr(value, "pk", value)})
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+        assert [item["id"] for item in response.data["results"]] == [expected.pk]
+
+    def test_list_filters_by_is_enabled(self, authenticated_client, obj):
+        """
+        GIVEN: two Orders, one disabled
+        WHEN: listing with ?is_enabled=false
+        THEN: only the disabled Order is returned
+        """
+        # GIVEN
+        order1, _ = obj
+        Order.objects.filter(pk=order1.pk).update(is_enabled=False)
+
+        # WHEN
+        response = authenticated_client.get(self.get_url_list(), {"is_enabled": "false"})
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+        assert [item["id"] for item in response.data["results"]] == [order1.pk]

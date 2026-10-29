@@ -1,6 +1,5 @@
-from django_filters.rest_framework import DjangoFilterBackend
-
 from gardeniq.base.views import BaseAPIModelViewSet
+from gardeniq.base.views import FilterAPIViewMixin
 from gardeniq.hardware.filters import ControllerFilter
 from gardeniq.hardware.models import Controller
 from gardeniq.hardware.models import ControllerCategory
@@ -19,12 +18,11 @@ class ControllerCategoryAPIModelView(BaseAPIModelViewSet):
     queryset = ControllerCategory.objects.all()
 
 
-class ControllerAPIModelView(BaseAPIModelViewSet):
+class ControllerAPIModelView(FilterAPIViewMixin, BaseAPIModelViewSet):
     serializer_class = ControllerSerializer
     list_serializer_class = ControllerListReadOnlySerializer
     detail_serializer_class = ControllerDetailReadOnlySerializer
     queryset = Controller.objects.all()
-    filter_backends = [DjangoFilterBackend]
     filterset_class = ControllerFilter
 
     def get_queryset(self):

@@ -1,3 +1,6 @@
+from django_filters.rest_framework import DjangoFilterBackend
+
+
 class DisableAPIViewMixin:
     attribute_error_msg = "The model {model_name} has no attribute 'is_enable'."
 
@@ -42,3 +45,12 @@ class DisableAPIViewMixin:
             obj.disable()
         else:
             raise AttributeError(self.attribute_error_msg.format(model_name=obj.__class__.__name__))
+
+
+class FilterAPIViewMixin:
+    """
+    Enable django-filter on a list view.
+    The view declares `filterset_class` (FilterSet in `<app>/filters.py`) or `filterset_fields`.
+    """
+
+    filter_backends: list[type] = [DjangoFilterBackend]

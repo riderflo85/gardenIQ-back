@@ -1,6 +1,5 @@
-from django_filters.rest_framework import DjangoFilterBackend
-
 from gardeniq.base.views import BaseAPIModelViewSet
+from gardeniq.base.views import FilterAPIViewMixin
 from gardeniq.base.views.base import READ_ONLY_HTTP_METHODS
 from gardeniq.hardware.filters import PinFilter
 from gardeniq.hardware.models import Channel
@@ -27,7 +26,7 @@ class ChannelAPIModelView(BaseAPIModelViewSet):
     http_method_names = READ_ONLY_HTTP_METHODS
 
 
-class PinAPIModelView(BaseAPIModelViewSet):
+class PinAPIModelView(FilterAPIViewMixin, BaseAPIModelViewSet):
     """API view for Pin model.
     The view provides read-only access to the Pin model, allowing users to retrieve
     a list of pins or details of a specific pin.
@@ -40,7 +39,6 @@ class PinAPIModelView(BaseAPIModelViewSet):
     list_serializer_class = PinMinimalReadOnlySerializer
     detail_serializer_class = PinDetailReadOnlySerializer
     queryset = Pin.objects.all()
-    filter_backends = [DjangoFilterBackend]
     filterset_class = PinFilter
     http_method_names = READ_ONLY_HTTP_METHODS
 

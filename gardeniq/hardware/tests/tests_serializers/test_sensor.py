@@ -7,11 +7,15 @@ from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
 from gardeniq.hardware.models import Sensor
 from gardeniq.hardware.models import SensorCategory
-from gardeniq.hardware.serializers import SensorCategoryReadOnlySerializer
+from gardeniq.hardware.serializers import SensorCategoryDetailReadOnlySerializer
+from gardeniq.hardware.serializers import SensorCategoryListReadOnlySerializer
+from gardeniq.hardware.serializers import SensorCategorySeederSerializer
 from gardeniq.hardware.serializers import SensorCategorySerializer
 from gardeniq.hardware.serializers import SensorDetailReadOnlySerializer
 from gardeniq.hardware.serializers import SensorListReadOnlySerializer
 from gardeniq.hardware.serializers import SensorSerializer
+
+VALID_PIN_INIT_CFG = {"c": "Pin", "a": {"id": "@pin"}}
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -66,7 +70,7 @@ def pin(device, channel):
 
 @pytest.fixture
 def sensor_category(db):
-    return SensorCategory.objects.create(name="Temperature", unity_value="°C")
+    return SensorCategory.objects.create(name="Temperature", unity_value="°C", pin_init_cfg=VALID_PIN_INIT_CFG)
 
 
 @pytest.fixture
@@ -93,8 +97,8 @@ class TestSensorCategorySerializer:
         THEN: the serializer is valid and data matches the input
         """
         # GIVEN
-        data = {"name": "Temperature", "unity_value": "°C", "pin_init_cfg": {"mode": "input"}}
-        expected = {"name": "Temperature", "unity_value": "°C", "pin_init_cfg": {"mode": "input"}}
+        data = {"name": "Temperature", "unity_value": "°C", "pin_init_cfg": VALID_PIN_INIT_CFG}
+        expected = {"name": "Temperature", "unity_value": "°C", "pin_init_cfg": VALID_PIN_INIT_CFG, "is_ready": True}
 
         # WHEN
         serializer = SensorCategorySerializer(data=data)
@@ -110,7 +114,7 @@ class TestSensorCategorySerializer:
         THEN: a SensorCategory is created with the correct values
         """
         # GIVEN
-        data = {"name": "Humidity", "unity_value": "%", "pin_init_cfg": {}}
+        data = {"name": "Humidity", "unity_value": "%", "pin_init_cfg": VALID_PIN_INIT_CFG}
 
         # WHEN
         serializer = SensorCategorySerializer(data=data)
@@ -131,7 +135,7 @@ class TestSensorCategorySerializer:
         THEN: the SensorCategory stores the nested configuration correctly
         """
         # GIVEN
-        cfg = {"mode": "input", "settings": {"pull": "up", "value": 0}}
+        cfg = {"c": "Pin", "a": {"id": "@pin", "mode": "@:OUT", "opts": {"pull": [1, 2], "value": None}}}
         data = {"name": "Light", "unity_value": "lux", "pin_init_cfg": cfg}
 
         # WHEN
@@ -149,7 +153,7 @@ class TestSensorCategorySerializer:
         THEN: the category is updated with the new values
         """
         # GIVEN
-        updated_data = {"name": "Updated Temperature", "unity_value": "°F", "pin_init_cfg": {"mode": "input"}}
+        updated_data = {"name": "Updated Temperature", "unity_value": "°F", "pin_init_cfg": VALID_PIN_INIT_CFG}
 
         # WHEN
         serializer = SensorCategorySerializer(instance=sensor_category, data=updated_data)
@@ -175,6 +179,7 @@ class TestSensorCategorySerializer:
             "name": sensor_category.name,
             "unity_value": sensor_category.unity_value,
             "pin_init_cfg": sensor_category.pin_init_cfg,
+            "is_ready": True,
         }
 
         # WHEN
@@ -183,13 +188,62 @@ class TestSensorCategorySerializer:
         # THEN
         assert serializer.data == expected
 
+    def test_invalid_pin_init_cfg(self):
+        """
+        GIVEN: a pin_init_cfg without a "@pin" argument
+        WHEN: validating through SensorCategorySerializer
+        THEN: the serializer is invalid with an error on pin_init_cfg
+        """
+        # GIVEN
+        data = {"name": "Temperature", "unity_value": "°C", "pin_init_cfg": {"c": "Pin", "a": {"id": 4}}}
 
-# ─── SensorCategoryReadOnlySerializer ─────────────────────────────────────────
+        # WHEN
+        serializer = SensorCategorySerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert "pin_init_cfg" in serializer.errors
+
+    def test_missing_pin_init_cfg(self):
+        """
+        GIVEN: data without pin_init_cfg
+        WHEN: validating through SensorCategorySerializer
+        THEN: the serializer is invalid because pin_init_cfg is required
+        """
+        # GIVEN
+        data = {"name": "Temperature", "unity_value": "°C"}
+
+        # WHEN
+        serializer = SensorCategorySerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert "pin_init_cfg" in serializer.errors
+
+    def test_is_ready_is_read_only(self):
+        """
+        GIVEN: data with is_ready set to False
+        WHEN: saving through SensorCategorySerializer
+        THEN: is_ready is ignored and the category is ready
+        """
+        # GIVEN
+        data = {"name": "Temperature", "unity_value": "°C", "pin_init_cfg": VALID_PIN_INIT_CFG, "is_ready": False}
+
+        # WHEN
+        serializer = SensorCategorySerializer(data=data)
+        assert serializer.is_valid(), serializer.errors
+        category = serializer.save()
+
+        # THEN
+        assert category.is_ready is True
+
+
+# ─── SensorCategoryDetailReadOnlySerializer ─────────────────────────────────────────
 
 
 @pytest.mark.django_db
-class TestSensorCategoryReadOnlySerializer:
-    """Tests for SensorCategoryReadOnlySerializer (read-only)."""
+class TestSensorCategoryDetailReadOnlySerializer:
+    """Tests for SensorCategoryDetailReadOnlySerializer (read-only)."""
 
     def test_cannot_save(self):
         """
@@ -199,10 +253,10 @@ class TestSensorCategoryReadOnlySerializer:
         """
         # GIVEN
         count_before = SensorCategory.objects.count()
-        data = {"name": "Temperature", "unity_value": "°C", "pin_init_cfg": {}}
+        data = {"name": "Temperature", "unity_value": "°C", "pin_init_cfg": VALID_PIN_INIT_CFG}
 
         # WHEN
-        serializer = SensorCategoryReadOnlySerializer(data=data)
+        serializer = SensorCategoryDetailReadOnlySerializer(data=data)
         assert serializer.is_valid()
         with pytest.raises(NotImplementedError):
             serializer.save()
@@ -218,10 +272,10 @@ class TestSensorCategoryReadOnlySerializer:
         """
         # GIVEN
         original_name = sensor_category.name
-        data = {"name": "Updated Temperature", "unity_value": "°F", "pin_init_cfg": {}}
+        data = {"name": "Updated Temperature", "unity_value": "°F", "pin_init_cfg": VALID_PIN_INIT_CFG}
 
         # WHEN
-        serializer = SensorCategoryReadOnlySerializer(instance=sensor_category, data=data)
+        serializer = SensorCategoryDetailReadOnlySerializer(instance=sensor_category, data=data)
         assert serializer.is_valid()
         with pytest.raises(NotImplementedError):
             serializer.save()
@@ -233,7 +287,7 @@ class TestSensorCategoryReadOnlySerializer:
     def test_serialized_instance(self, sensor_category):
         """
         GIVEN: an existing SensorCategory instance
-        WHEN: serializing with SensorCategoryReadOnlySerializer
+        WHEN: serializing with SensorCategoryDetailReadOnlySerializer
         THEN: the serializer data matches the expected representation
         """
         # GIVEN
@@ -242,13 +296,111 @@ class TestSensorCategoryReadOnlySerializer:
             "name": sensor_category.name,
             "unity_value": sensor_category.unity_value,
             "pin_init_cfg": sensor_category.pin_init_cfg,
+            "is_ready": True,
         }
 
         # WHEN
-        serializer = SensorCategoryReadOnlySerializer(instance=sensor_category)
+        serializer = SensorCategoryDetailReadOnlySerializer(instance=sensor_category)
 
         # THEN
         assert serializer.data == expected
+
+
+# ─── SensorCategoryListReadOnlySerializer ───────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestSensorCategoryListReadOnlySerializer:
+    """Tests for SensorCategoryListReadOnlySerializer (read-only)."""
+
+    def test_serialized_instance_hides_pin_init_cfg(self, sensor_category):
+        """
+        GIVEN: an existing SensorCategory instance
+        WHEN: serializing with SensorCategoryListReadOnlySerializer
+        THEN: pin_init_cfg is not in the output
+        """
+        # GIVEN
+        expected = {
+            "id": sensor_category.pk,
+            "name": sensor_category.name,
+            "unity_value": sensor_category.unity_value,
+            "is_ready": True,
+        }
+
+        # WHEN
+        serializer = SensorCategoryListReadOnlySerializer(instance=sensor_category)
+
+        # THEN
+        assert serializer.data == expected
+
+
+# ─── SensorCategorySeederSerializer ─────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestSensorCategorySeederSerializer:
+    """Tests for SensorCategorySeederSerializer (used by the seeder)."""
+
+    def test_create_with_seed_fields(self):
+        """
+        GIVEN: valid data with seed_id and is_ready
+        WHEN: saving through SensorCategorySeederSerializer
+        THEN: seed_id and is_ready are written
+        """
+        # GIVEN
+        data = {
+            "seed_id": 3,
+            "is_ready": False,
+            "name": "Temperature",
+            "unity_value": "°C",
+            "pin_init_cfg": VALID_PIN_INIT_CFG,
+        }
+
+        # WHEN
+        serializer = SensorCategorySeederSerializer(data=data)
+        assert serializer.is_valid(), serializer.errors
+        category = serializer.save()
+
+        # THEN
+        assert category.seed_id == 3
+        assert category.is_ready is False
+
+    def test_seed_id_is_required(self):
+        """
+        GIVEN: data without seed_id
+        WHEN: validating through SensorCategorySeederSerializer
+        THEN: the serializer is invalid with an error on seed_id
+        """
+        # GIVEN
+        data = {"name": "Temperature", "unity_value": "°C", "pin_init_cfg": VALID_PIN_INIT_CFG}
+
+        # WHEN
+        serializer = SensorCategorySeederSerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert "seed_id" in serializer.errors
+
+    def test_invalid_pin_init_cfg(self):
+        """
+        GIVEN: seeder data with an invalid pin_init_cfg
+        WHEN: validating through SensorCategorySeederSerializer
+        THEN: the serializer is invalid with an error on pin_init_cfg
+        """
+        # GIVEN
+        data = {
+            "seed_id": 3,
+            "name": "Temperature",
+            "unity_value": "°C",
+            "pin_init_cfg": {"c": "Pin", "a": {"id": "@pin"}, "x": 1},
+        }
+
+        # WHEN
+        serializer = SensorCategorySeederSerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert "pin_init_cfg" in serializer.errors
 
 
 # ─── SensorSerializer ─────────────────────────────────────────────────────────
@@ -319,7 +471,7 @@ class TestSensorSerializer:
         THEN: the Sensor is updated with the new values
         """
         # GIVEN
-        new_category = SensorCategory.objects.create(name="Humidity", unity_value="%", pin_init_cfg={})
+        new_category = SensorCategory.objects.create(name="Humidity", unity_value="%", pin_init_cfg=VALID_PIN_INIT_CFG)
         new_pin = Pin.objects.create(device=device, channel_choiced=channel, pin_number=2)
         updated_data = {
             "name": "Updated Temp Sensor",

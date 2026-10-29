@@ -13,6 +13,8 @@ from gardeniq.hardware.models import Sensor
 from gardeniq.hardware.models import SensorCategory
 from gardeniq.orderlg.models import Order
 
+VALID_PIN_INIT_CFG = {"c": "Pin", "a": {"id": "@pin"}}
+
 # ─── Hardware Fixtures ──────────────────────────────────────────────────────────
 
 
@@ -69,7 +71,7 @@ def pin2(device, channel):
 
 @pytest.fixture
 def sensor_category(db):
-    return SensorCategory.objects.create(name="Temperature", unity_value="°C")
+    return SensorCategory.objects.create(name="Temperature", unity_value="°C", pin_init_cfg=VALID_PIN_INIT_CFG)
 
 
 @pytest.fixture
@@ -84,7 +86,7 @@ def sensor(sensor_category, device, pin):
 
 @pytest.fixture
 def controller_category(db):
-    return ControllerCategory.objects.create(name="Relay")
+    return ControllerCategory.objects.create(name="Relay", pin_init_cfg=VALID_PIN_INIT_CFG)
 
 
 @pytest.fixture

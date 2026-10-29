@@ -1,7 +1,8 @@
 from gardeniq.base.views import BaseAPIModelViewSet
 from gardeniq.hardware.models import Controller
 from gardeniq.hardware.models import ControllerCategory
-from gardeniq.hardware.serializers import ControllerCategoryReadOnlySerializer
+from gardeniq.hardware.serializers import ControllerCategoryDetailReadOnlySerializer
+from gardeniq.hardware.serializers import ControllerCategoryListReadOnlySerializer
 from gardeniq.hardware.serializers import ControllerCategorySerializer
 from gardeniq.hardware.serializers import ControllerDetailReadOnlySerializer
 from gardeniq.hardware.serializers import ControllerListReadOnlySerializer
@@ -10,7 +11,8 @@ from gardeniq.hardware.serializers import ControllerSerializer
 
 class ControllerCategoryAPIModelView(BaseAPIModelViewSet):
     serializer_class = ControllerCategorySerializer
-    detail_serializer_class = ControllerCategoryReadOnlySerializer
+    list_serializer_class = ControllerCategoryListReadOnlySerializer
+    detail_serializer_class = ControllerCategoryDetailReadOnlySerializer
     queryset = ControllerCategory.objects.all()
 
 

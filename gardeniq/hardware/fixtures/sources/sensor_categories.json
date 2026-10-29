@@ -1,0 +1,9 @@
+[
+    {
+        "seed_id": 1,
+        "is_ready": true,
+        "name": "Temperature °C",
+        "pin_init_cfg": {"c": "ADC", "a": {"id": "@pin"}},
+        "unity_value": "°C"
+    }
+]

@@ -4,6 +4,8 @@ from gardeniq.base.serializers import BaseSerializer
 from gardeniq.base.serializers import MinimalReadOnlySerializer
 from gardeniq.base.serializers import NameMixinSerializer
 from gardeniq.base.serializers import ReadOnlySerializer
+from gardeniq.base.serializers import SeederIsReadyMixinSerializer
+from gardeniq.base.serializers import SeederMixinSerializer
 from gardeniq.hardware.models import Device
 from gardeniq.hardware.models import Pin
 from gardeniq.hardware.models import Sensor
@@ -15,14 +17,29 @@ from .mixins import PinInitConfigMixinSerializer
 from .pin import PinMinimalReadOnlySerializer
 
 
-class SensorCategorySerializer(BaseSerializer, NameMixinSerializer, PinInitConfigMixinSerializer):
+class SensorCategorySerializer(
+    BaseSerializer,
+    NameMixinSerializer,
+    PinInitConfigMixinSerializer,
+    SeederIsReadyMixinSerializer,
+):
     unity_value = serializers.CharField(max_length=20)
+    # Override is_ready field to be read-only and default to True
+    is_ready = serializers.BooleanField(read_only=True, default=True)
 
     class Meta:
         model = SensorCategory
 
 
-class SensorCategoryReadOnlySerializer(ReadOnlySerializer, SensorCategorySerializer):
+class SensorCategoryListReadOnlySerializer(ReadOnlySerializer, SensorCategorySerializer):
+    pin_init_cfg = None  # Hide pin_init_cfg in list view
+
+
+class SensorCategoryDetailReadOnlySerializer(ReadOnlySerializer, SensorCategorySerializer):
+    pass
+
+
+class SensorCategorySeederSerializer(SeederMixinSerializer, SensorCategorySerializer):
     pass
 
 

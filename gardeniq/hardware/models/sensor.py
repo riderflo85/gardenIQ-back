@@ -1,17 +1,20 @@
 from django.db import models
 
 from gardeniq.base.models import NameMixinModel
+from gardeniq.base.models import SeederMixinModel
 
 from .device import Device
 from .mixins import PinInitConfigMixin
 from .pin import Pin
 
 
-class SensorCategory(PinInitConfigMixin, NameMixinModel):
+class SensorCategory(PinInitConfigMixin, NameMixinModel, SeederMixinModel):
     """
     Inherited fields:
       - `name`
       - `pin_init_cfg`
+      - `seed_id`
+      - `is_ready`
     """
 
     unity_value = models.CharField(

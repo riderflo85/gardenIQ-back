@@ -11,6 +11,8 @@ from gardeniq.hardware.models import Device
 from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
 
+VALID_PIN_INIT_CFG = {"c": "Pin", "a": {"id": "@pin"}}
+
 # ─── ControllerCategory View Tests ────────────────────────────────────────────
 
 
@@ -18,11 +20,11 @@ from gardeniq.hardware.models import Pin
 class ControllerCategoryViewSetTestConf(ViewSetTestMixin):
     BASE_PATTERN = "controller-categories"
     MODEL = ControllerCategory
-    DATA_TO_DEFAULT_OBJ = {"name": "Default Category", "pin_init_cfg": {}}
+    DATA_TO_DEFAULT_OBJ = {"name": "Default Category", "pin_init_cfg": VALID_PIN_INIT_CFG}
 
     def generate_default_obj(self):
-        cat1 = ControllerCategory.objects.create(name="Relay", pin_init_cfg={"mode": "output"})
-        cat2 = ControllerCategory.objects.create(name="LED Driver", pin_init_cfg={})
+        cat1 = ControllerCategory.objects.create(name="Relay", pin_init_cfg=VALID_PIN_INIT_CFG)
+        cat2 = ControllerCategory.objects.create(name="LED Driver", pin_init_cfg=VALID_PIN_INIT_CFG)
         return cat1, cat2
 
 
@@ -47,7 +49,8 @@ class TestControllerCategoryAPIModelView(ControllerCategoryViewSetTestConf):
         first = response.data["results"][0]
         assert "id" in first
         assert "name" in first
-        assert "pin_init_cfg" in first
+        assert "pin_init_cfg" not in first
+        assert first["is_ready"] is True
 
     def test_retrieve(self, authenticated_client, obj):
         """Test retrieving a specific controller category."""
@@ -63,11 +66,12 @@ class TestControllerCategoryAPIModelView(ControllerCategoryViewSetTestConf):
         assert response.data["id"] == cat1.pk
         assert response.data["name"] == cat1.name
         assert response.data["pin_init_cfg"] == cat1.pin_init_cfg
+        assert response.data["is_ready"] is True
 
     def test_create(self, authenticated_client):
         """Test creating a new controller category."""
         # GIVEN
-        payload = {"name": "New Category", "pin_init_cfg": {"mode": "output"}}
+        payload = {"name": "New Category", "pin_init_cfg": VALID_PIN_INIT_CFG}
         url = self.get_url_create()
 
         # WHEN
@@ -84,7 +88,7 @@ class TestControllerCategoryAPIModelView(ControllerCategoryViewSetTestConf):
         # GIVEN
         cat1, _ = obj
         url = self.get_url_detail(cat1)
-        update_data = {"name": "Updated Relay", "pin_init_cfg": {"mode": "input", "frequency": 500}}
+        update_data = {"name": "Updated Relay", "pin_init_cfg": {"c": "PWM", "a": {"dest": "@pin", "freq": 500}}}
 
         # WHEN
         response = authenticated_client.put(url, update_data, format="json")
@@ -96,6 +100,36 @@ class TestControllerCategoryAPIModelView(ControllerCategoryViewSetTestConf):
         cat1.refresh_from_db()
         assert cat1.name == update_data["name"]
         assert cat1.pin_init_cfg == update_data["pin_init_cfg"]
+
+    def test_create_with_invalid_pin_init_cfg(self, authenticated_client):
+        """Test that creating a controller category with an invalid pin_init_cfg returns 400."""
+        # GIVEN
+        payload = {"name": "New Category", "pin_init_cfg": {"c": "Pin", "a": {"id": 4}}}
+        url = self.get_url_create()
+
+        # WHEN
+        response = authenticated_client.post(url, payload, format="json")
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+        assert "pin_init_cfg" in response.data
+        assert not ControllerCategory.objects.filter(name=payload["name"]).exists()
+
+    def test_update_with_invalid_pin_init_cfg(self, authenticated_client, obj):
+        """Test that updating a controller category with an invalid pin_init_cfg returns 400 and keeps the old value."""
+        # GIVEN
+        cat1, _ = obj
+        url = self.get_url_detail(cat1)
+        update_data = {"name": "New Category", "pin_init_cfg": {"c": "UART", "a": {"id": "@pin"}}}
+
+        # WHEN
+        response = authenticated_client.put(url, update_data, format="json")
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+        assert "pin_init_cfg" in response.data
+        cat1.refresh_from_db()
+        assert cat1.pin_init_cfg == VALID_PIN_INIT_CFG
 
     def test_delete(self, authenticated_client, obj):
         """Test deleting a controller category."""
@@ -167,7 +201,7 @@ class ControllerViewSetTestConf(ViewSetTestMixin):
 
     @pytest.fixture
     def category(self, db):
-        return ControllerCategory.objects.create(name="Relay")
+        return ControllerCategory.objects.create(name="Relay", pin_init_cfg=VALID_PIN_INIT_CFG)
 
     @pytest.fixture
     def obj(self, category, device, pin, channel):
@@ -275,7 +309,7 @@ class TestControllerAPIModelView(ControllerViewSetTestConf):
         """Test updating an existing controller."""
         # GIVEN
         ctrl1, _ = obj
-        new_category = ControllerCategory.objects.create(name="Motor Controller")
+        new_category = ControllerCategory.objects.create(name="Motor Controller", pin_init_cfg=VALID_PIN_INIT_CFG)
         url = self.get_url_detail(ctrl1)
         update_data = {
             "name": "Updated Controller",

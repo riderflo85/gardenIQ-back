@@ -115,16 +115,16 @@ class PinAdmin(admin.ModelAdmin):
 class ControllerCategoryAdmin(admin.ModelAdmin):
     """Admin interface for the ControllerCategory model."""
 
-    list_display = ("id", "name")
-    search_fields = ("name",)
+    list_display = ("id", "name") + seeder_fields_name
+    search_fields = ("name",) + seeder_fields_name
 
 
 @admin.register(SensorCategory)
 class SensorCategoryAdmin(admin.ModelAdmin):
     """Admin interface for the SensorCategory model."""
 
-    list_display = ("id", "name", "unity_value")
-    search_fields = ("name",)
+    list_display = ("id", "name", "unity_value") + seeder_fields_name
+    search_fields = ("name",) + seeder_fields_name
 
 
 @admin.register(Sensor)

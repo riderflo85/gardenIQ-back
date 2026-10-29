@@ -11,6 +11,8 @@ from gardeniq.hardware.models import Pin
 from gardeniq.hardware.models import Sensor
 from gardeniq.hardware.models import SensorCategory
 
+VALID_PIN_INIT_CFG = {"c": "Pin", "a": {"id": "@pin"}}
+
 # ─── SensorCategory View Tests ────────────────────────────────────────────────
 
 
@@ -18,11 +20,11 @@ from gardeniq.hardware.models import SensorCategory
 class SensorCategoryViewSetTestConf(ViewSetTestMixin):
     BASE_PATTERN = "sensor-categories"
     MODEL = SensorCategory
-    DATA_TO_DEFAULT_OBJ = {"name": "Default Category", "unity_value": "", "pin_init_cfg": {}}
+    DATA_TO_DEFAULT_OBJ = {"name": "Default Category", "unity_value": "", "pin_init_cfg": VALID_PIN_INIT_CFG}
 
     def generate_default_obj(self):
-        cat1 = SensorCategory.objects.create(name="Temperature", unity_value="°C", pin_init_cfg={})
-        cat2 = SensorCategory.objects.create(name="Humidity", unity_value="%", pin_init_cfg={})
+        cat1 = SensorCategory.objects.create(name="Temperature", unity_value="°C", pin_init_cfg=VALID_PIN_INIT_CFG)
+        cat2 = SensorCategory.objects.create(name="Humidity", unity_value="%", pin_init_cfg=VALID_PIN_INIT_CFG)
         return cat1, cat2
 
 
@@ -52,7 +54,8 @@ class TestSensorCategoryAPIModelView(SensorCategoryViewSetTestConf):
         assert "id" in first
         assert "name" in first
         assert "unity_value" in first
-        assert "pin_init_cfg" in first
+        assert "pin_init_cfg" not in first
+        assert first["is_ready"] is True
 
     def test_retrieve(self, authenticated_client, obj):
         """
@@ -73,6 +76,7 @@ class TestSensorCategoryAPIModelView(SensorCategoryViewSetTestConf):
         assert response.data["name"] == cat1.name
         assert response.data["unity_value"] == cat1.unity_value
         assert response.data["pin_init_cfg"] == cat1.pin_init_cfg
+        assert response.data["is_ready"] is True
 
     def test_create(self, authenticated_client):
         """
@@ -81,7 +85,7 @@ class TestSensorCategoryAPIModelView(SensorCategoryViewSetTestConf):
         THEN: the SensorCategory is created and the response contains the correct data
         """
         # GIVEN
-        payload = {"name": "Light", "unity_value": "lux", "pin_init_cfg": {"mode": "input"}}
+        payload = {"name": "Light", "unity_value": "lux", "pin_init_cfg": VALID_PIN_INIT_CFG}
         url = self.get_url_create()
 
         # WHEN
@@ -103,7 +107,7 @@ class TestSensorCategoryAPIModelView(SensorCategoryViewSetTestConf):
         # GIVEN
         cat1, _ = obj
         url = self.get_url_detail(cat1)
-        update_data = {"name": "Updated Temperature", "unity_value": "°F", "pin_init_cfg": {"mode": "input"}}
+        update_data = {"name": "Updated Temperature", "unity_value": "°F", "pin_init_cfg": VALID_PIN_INIT_CFG}
 
         # WHEN
         response = authenticated_client.put(url, update_data, format="json")
@@ -117,6 +121,36 @@ class TestSensorCategoryAPIModelView(SensorCategoryViewSetTestConf):
         assert cat1.name == update_data["name"]
         assert cat1.unity_value == update_data["unity_value"]
         assert cat1.pin_init_cfg == update_data["pin_init_cfg"]
+
+    def test_create_with_invalid_pin_init_cfg(self, authenticated_client):
+        """Test that creating a sensor category with an invalid pin_init_cfg returns 400."""
+        # GIVEN
+        payload = {"name": "Light", "unity_value": "lux", "pin_init_cfg": {"c": "Pin", "a": {"id": 4}}}
+        url = self.get_url_create()
+
+        # WHEN
+        response = authenticated_client.post(url, payload, format="json")
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+        assert "pin_init_cfg" in response.data
+        assert not SensorCategory.objects.filter(name=payload["name"]).exists()
+
+    def test_update_with_invalid_pin_init_cfg(self, authenticated_client, obj):
+        """Test that updating a sensor category with an invalid pin_init_cfg returns 400 and keeps the old value."""
+        # GIVEN
+        cat1, _ = obj
+        url = self.get_url_detail(cat1)
+        update_data = {"name": "Light", "unity_value": "lux", "pin_init_cfg": {"c": "UART", "a": {"id": "@pin"}}}
+
+        # WHEN
+        response = authenticated_client.put(url, update_data, format="json")
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+        assert "pin_init_cfg" in response.data
+        cat1.refresh_from_db()
+        assert cat1.pin_init_cfg == VALID_PIN_INIT_CFG
 
     def test_delete(self, authenticated_client, obj):
         """
@@ -196,7 +230,7 @@ class SensorViewSetTestConf(ViewSetTestMixin):
 
     @pytest.fixture
     def category(self, db):
-        return SensorCategory.objects.create(name="Temperature", unity_value="°C", pin_init_cfg={})
+        return SensorCategory.objects.create(name="Temperature", unity_value="°C", pin_init_cfg=VALID_PIN_INIT_CFG)
 
     @pytest.fixture
     def obj(self, category, device, pin, channel):
@@ -320,7 +354,7 @@ class TestSensorAPIModelView(SensorViewSetTestConf):
         """
         # GIVEN
         sensor1, _ = obj
-        new_category = SensorCategory.objects.create(name="Humidity", unity_value="%", pin_init_cfg={})
+        new_category = SensorCategory.objects.create(name="Humidity", unity_value="%", pin_init_cfg=VALID_PIN_INIT_CFG)
         url = self.get_url_detail(sensor1)
         update_data = {
             "name": "Updated Sensor",

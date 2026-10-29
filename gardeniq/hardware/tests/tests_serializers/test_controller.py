@@ -7,11 +7,15 @@ from gardeniq.hardware.models import ControllerCategory
 from gardeniq.hardware.models import Device
 from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
-from gardeniq.hardware.serializers import ControllerCategoryReadOnlySerializer
+from gardeniq.hardware.serializers import ControllerCategoryDetailReadOnlySerializer
+from gardeniq.hardware.serializers import ControllerCategoryListReadOnlySerializer
+from gardeniq.hardware.serializers import ControllerCategorySeederSerializer
 from gardeniq.hardware.serializers import ControllerCategorySerializer
 from gardeniq.hardware.serializers import ControllerDetailReadOnlySerializer
 from gardeniq.hardware.serializers import ControllerListReadOnlySerializer
 from gardeniq.hardware.serializers import ControllerSerializer
+
+VALID_PIN_INIT_CFG = {"c": "Pin", "a": {"id": "@pin"}}
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -66,7 +70,7 @@ def pin(device, channel):
 
 @pytest.fixture
 def controller_category(db):
-    return ControllerCategory.objects.create(name="Relay")
+    return ControllerCategory.objects.create(name="Relay", pin_init_cfg=VALID_PIN_INIT_CFG)
 
 
 @pytest.fixture
@@ -93,8 +97,8 @@ class TestControllerCategorySerializer:
         THEN: the serializer is valid and data matches the input
         """
         # GIVEN
-        data = {"name": "Relay", "pin_init_cfg": {"mode": "output"}}
-        expected = {"name": "Relay", "pin_init_cfg": {"mode": "output"}}
+        data = {"name": "Relay", "pin_init_cfg": VALID_PIN_INIT_CFG}
+        expected = {"name": "Relay", "pin_init_cfg": VALID_PIN_INIT_CFG, "is_ready": True}
 
         # WHEN
         serializer = ControllerCategorySerializer(data=data)
@@ -110,7 +114,7 @@ class TestControllerCategorySerializer:
         THEN: a ControllerCategory is created with the correct values
         """
         # GIVEN
-        data = {"name": "Motor Controller", "pin_init_cfg": {}}
+        data = {"name": "Motor Controller", "pin_init_cfg": VALID_PIN_INIT_CFG}
 
         # WHEN
         serializer = ControllerCategorySerializer(data=data)
@@ -130,7 +134,7 @@ class TestControllerCategorySerializer:
         THEN: the ControllerCategory stores the nested configuration correctly
         """
         # GIVEN
-        cfg = {"mode": "output", "settings": {"pull": "none", "value": 0}}
+        cfg = {"c": "Pin", "a": {"id": "@pin", "mode": "@:OUT", "opts": {"pull": [1, 2], "value": None}}}
         data = {"name": "LED Driver", "pin_init_cfg": cfg}
 
         # WHEN
@@ -148,7 +152,7 @@ class TestControllerCategorySerializer:
         THEN: the category is updated with the new values
         """
         # GIVEN
-        updated_data = {"name": "Updated Relay", "pin_init_cfg": {"mode": "input"}}
+        updated_data = {"name": "Updated Relay", "pin_init_cfg": VALID_PIN_INIT_CFG}
 
         # WHEN
         serializer = ControllerCategorySerializer(instance=controller_category, data=updated_data)
@@ -172,6 +176,7 @@ class TestControllerCategorySerializer:
             "id": controller_category.pk,
             "name": controller_category.name,
             "pin_init_cfg": controller_category.pin_init_cfg,
+            "is_ready": True,
         }
 
         # WHEN
@@ -180,13 +185,62 @@ class TestControllerCategorySerializer:
         # THEN
         assert serializer.data == expected
 
+    def test_invalid_pin_init_cfg(self):
+        """
+        GIVEN: a pin_init_cfg without a "@pin" argument
+        WHEN: validating through ControllerCategorySerializer
+        THEN: the serializer is invalid with an error on pin_init_cfg
+        """
+        # GIVEN
+        data = {"name": "Relay", "pin_init_cfg": {"c": "Pin", "a": {"id": 4}}}
 
-# ─── ControllerCategoryReadOnlySerializer ─────────────────────────────────────
+        # WHEN
+        serializer = ControllerCategorySerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert "pin_init_cfg" in serializer.errors
+
+    def test_missing_pin_init_cfg(self):
+        """
+        GIVEN: data without pin_init_cfg
+        WHEN: validating through ControllerCategorySerializer
+        THEN: the serializer is invalid because pin_init_cfg is required
+        """
+        # GIVEN
+        data = {"name": "Relay"}
+
+        # WHEN
+        serializer = ControllerCategorySerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert "pin_init_cfg" in serializer.errors
+
+    def test_is_ready_is_read_only(self):
+        """
+        GIVEN: data with is_ready set to False
+        WHEN: saving through ControllerCategorySerializer
+        THEN: is_ready is ignored and the category is ready
+        """
+        # GIVEN
+        data = {"name": "Relay", "pin_init_cfg": VALID_PIN_INIT_CFG, "is_ready": False}
+
+        # WHEN
+        serializer = ControllerCategorySerializer(data=data)
+        assert serializer.is_valid(), serializer.errors
+        category = serializer.save()
+
+        # THEN
+        assert category.is_ready is True
+
+
+# ─── ControllerCategoryDetailReadOnlySerializer ─────────────────────────────────────
 
 
 @pytest.mark.django_db
-class TestControllerCategoryReadOnlySerializer:
-    """Tests for ControllerCategoryReadOnlySerializer (read-only)."""
+class TestControllerCategoryDetailReadOnlySerializer:
+    """Tests for ControllerCategoryDetailReadOnlySerializer (read-only)."""
 
     def test_cannot_save(self):
         """
@@ -196,10 +250,10 @@ class TestControllerCategoryReadOnlySerializer:
         """
         # GIVEN
         count_before = ControllerCategory.objects.count()
-        data = {"name": "Relay", "pin_init_cfg": {}}
+        data = {"name": "Relay", "pin_init_cfg": VALID_PIN_INIT_CFG}
 
         # WHEN
-        serializer = ControllerCategoryReadOnlySerializer(data=data)
+        serializer = ControllerCategoryDetailReadOnlySerializer(data=data)
         assert serializer.is_valid()
         with pytest.raises(NotImplementedError):
             serializer.save()
@@ -215,10 +269,10 @@ class TestControllerCategoryReadOnlySerializer:
         """
         # GIVEN
         original_name = controller_category.name
-        data = {"name": "Updated Relay", "pin_init_cfg": {}}
+        data = {"name": "Updated Relay", "pin_init_cfg": VALID_PIN_INIT_CFG}
 
         # WHEN
-        serializer = ControllerCategoryReadOnlySerializer(instance=controller_category, data=data)
+        serializer = ControllerCategoryDetailReadOnlySerializer(instance=controller_category, data=data)
         assert serializer.is_valid()
         with pytest.raises(NotImplementedError):
             serializer.save()
@@ -230,7 +284,7 @@ class TestControllerCategoryReadOnlySerializer:
     def test_serialized_instance(self, controller_category):
         """
         GIVEN: an existing ControllerCategory instance
-        WHEN: serializing with ControllerCategoryReadOnlySerializer
+        WHEN: serializing with ControllerCategoryDetailReadOnlySerializer
         THEN: the serializer data matches the expected representation
         """
         # GIVEN
@@ -238,13 +292,99 @@ class TestControllerCategoryReadOnlySerializer:
             "id": controller_category.pk,
             "name": controller_category.name,
             "pin_init_cfg": controller_category.pin_init_cfg,
+            "is_ready": True,
         }
 
         # WHEN
-        serializer = ControllerCategoryReadOnlySerializer(instance=controller_category)
+        serializer = ControllerCategoryDetailReadOnlySerializer(instance=controller_category)
 
         # THEN
         assert serializer.data == expected
+
+
+# ─── ControllerCategoryListReadOnlySerializer ───────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestControllerCategoryListReadOnlySerializer:
+    """Tests for ControllerCategoryListReadOnlySerializer (read-only)."""
+
+    def test_serialized_instance_hides_pin_init_cfg(self, controller_category):
+        """
+        GIVEN: an existing ControllerCategory instance
+        WHEN: serializing with ControllerCategoryListReadOnlySerializer
+        THEN: pin_init_cfg is not in the output
+        """
+        # GIVEN
+        expected = {
+            "id": controller_category.pk,
+            "name": controller_category.name,
+            "is_ready": True,
+        }
+
+        # WHEN
+        serializer = ControllerCategoryListReadOnlySerializer(instance=controller_category)
+
+        # THEN
+        assert serializer.data == expected
+
+
+# ─── ControllerCategorySeederSerializer ─────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestControllerCategorySeederSerializer:
+    """Tests for ControllerCategorySeederSerializer (used by the seeder)."""
+
+    def test_create_with_seed_fields(self):
+        """
+        GIVEN: valid data with seed_id and is_ready
+        WHEN: saving through ControllerCategorySeederSerializer
+        THEN: seed_id and is_ready are written
+        """
+        # GIVEN
+        data = {"seed_id": 3, "is_ready": False, "name": "Relay", "pin_init_cfg": VALID_PIN_INIT_CFG}
+
+        # WHEN
+        serializer = ControllerCategorySeederSerializer(data=data)
+        assert serializer.is_valid(), serializer.errors
+        category = serializer.save()
+
+        # THEN
+        assert category.seed_id == 3
+        assert category.is_ready is False
+
+    def test_seed_id_is_required(self):
+        """
+        GIVEN: data without seed_id
+        WHEN: validating through ControllerCategorySeederSerializer
+        THEN: the serializer is invalid with an error on seed_id
+        """
+        # GIVEN
+        data = {"name": "Relay", "pin_init_cfg": VALID_PIN_INIT_CFG}
+
+        # WHEN
+        serializer = ControllerCategorySeederSerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert "seed_id" in serializer.errors
+
+    def test_invalid_pin_init_cfg(self):
+        """
+        GIVEN: seeder data with an invalid pin_init_cfg
+        WHEN: validating through ControllerCategorySeederSerializer
+        THEN: the serializer is invalid with an error on pin_init_cfg
+        """
+        # GIVEN
+        data = {"seed_id": 3, "name": "Relay", "pin_init_cfg": {"c": "Pin", "a": {"id": "@pin"}, "x": 1}}
+
+        # WHEN
+        serializer = ControllerCategorySeederSerializer(data=data)
+
+        # THEN
+        assert not serializer.is_valid()
+        assert "pin_init_cfg" in serializer.errors
 
 
 # ─── ControllerSerializer ─────────────────────────────────────────────────────
@@ -315,7 +455,7 @@ class TestControllerSerializer:
         THEN: the Controller is updated with the new values
         """
         # GIVEN
-        new_category = ControllerCategory.objects.create(name="Motor Controller")
+        new_category = ControllerCategory.objects.create(name="Motor Controller", pin_init_cfg=VALID_PIN_INIT_CFG)
         new_pin = Pin.objects.create(device=device, channel_choiced=channel, pin_number=2)
         updated_data = {
             "name": "Updated Relay",

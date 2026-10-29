@@ -586,7 +586,7 @@ class TestDeviceCategorySeederSerializer:
     def test_create_with_seed_fields(self):
         """The seeder serializer writes seed_id and is_ready."""
         # GIVEN
-        data = {"seed_id": "3", "is_ready": False, "name": "Pico", "pins_configuration": VALID_PINS_CONFIGURATION}
+        data = {"seed_id": 3, "is_ready": False, "name": "Pico", "pins_configuration": VALID_PINS_CONFIGURATION}
         serializer = DeviceCategorySeederSerializer(data=data)
 
         # WHEN

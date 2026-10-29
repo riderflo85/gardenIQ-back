@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db.models import ProtectedError
 
 import pytest
@@ -9,6 +10,8 @@ from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
 from gardeniq.hardware.models import Sensor
 from gardeniq.hardware.models import SensorCategory
+
+VALID_PIN_INIT_CFG = {"c": "Pin", "a": {"id": "@pin"}}
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -55,7 +58,7 @@ def pin(device, channel):
 
 @pytest.fixture
 def sensor_category(db):
-    return SensorCategory.objects.create(name="Temperature", unity_value="°C")
+    return SensorCategory.objects.create(name="Temperature", unity_value="°C", pin_init_cfg=VALID_PIN_INIT_CFG)
 
 
 @pytest.fixture
@@ -75,20 +78,21 @@ def sensor(sensor_category, device, pin):
 class TestSensorCategoryCreation:
     """Tests for SensorCategory model creation."""
 
-    def test_create_with_name_only(self):
+    def test_create_with_default_seeder_fields(self):
         """
-        GIVEN: a name for a SensorCategory
-        WHEN: creating a SensorCategory without specifying unity_value or pin_init_cfg
-        THEN: the SensorCategory is created with an empty unity_value and an empty dict as default pin_init_cfg
+        GIVEN: a name and a valid pin_init_cfg
+        WHEN: creating a SensorCategory without seeder fields
+        THEN: is_ready defaults to True and seed_id to None
         """
         # GIVEN / WHEN
-        category = SensorCategory.objects.create(name="Humidity")
+        category = SensorCategory.objects.create(name="Humidity", pin_init_cfg=VALID_PIN_INIT_CFG)
 
         # THEN
         assert category.pk is not None
         assert category.name == "Humidity"
         assert category.unity_value == ""
-        assert category.pin_init_cfg == {}
+        assert category.is_ready is True
+        assert category.seed_id is None
 
     def test_create_with_unity_value(self):
         """
@@ -97,7 +101,7 @@ class TestSensorCategoryCreation:
         THEN: the SensorCategory is created with the correct unity_value
         """
         # GIVEN / WHEN
-        category = SensorCategory.objects.create(name="Temperature", unity_value="°C")
+        category = SensorCategory.objects.create(name="Temperature", unity_value="°C", pin_init_cfg=VALID_PIN_INIT_CFG)
 
         # THEN
         assert category.pk is not None
@@ -110,7 +114,7 @@ class TestSensorCategoryCreation:
         THEN: the SensorCategory is created with the provided configuration
         """
         # GIVEN
-        cfg = {"mode": "input", "pull": "up"}
+        cfg = {"c": "ADC", "a": {"id": "@pin", "atten": "@:ATTN_11DB"}}
 
         # WHEN
         category = SensorCategory.objects.create(name="Light", pin_init_cfg=cfg)
@@ -130,7 +134,7 @@ class TestSensorCategoryCreation:
 
         # WHEN
         for name in names:
-            SensorCategory.objects.create(name=name)
+            SensorCategory.objects.create(name=name, pin_init_cfg=VALID_PIN_INIT_CFG)
 
         # THEN
         assert SensorCategory.objects.count() == len(names)
@@ -147,7 +151,7 @@ class TestSensorCategoryUnityValue:
         THEN: the field defaults to an empty string
         """
         # GIVEN / WHEN
-        category = SensorCategory.objects.create(name="Pressure")
+        category = SensorCategory.objects.create(name="Pressure", pin_init_cfg=VALID_PIN_INIT_CFG)
 
         # THEN
         assert category.unity_value == ""
@@ -180,7 +184,9 @@ class TestSensorCategoryUnityValue:
 
         # WHEN / THEN
         for unity in unity_values:
-            category = SensorCategory.objects.create(name=f"Sensor {unity}", unity_value=unity)
+            category = SensorCategory.objects.create(
+                name=f"Sensor {unity}", unity_value=unity, pin_init_cfg=VALID_PIN_INIT_CFG
+            )
             refreshed = SensorCategory.objects.get(pk=category.pk)
             assert refreshed.unity_value == unity
 
@@ -189,26 +195,25 @@ class TestSensorCategoryUnityValue:
 class TestSensorCategoryPinInitCfg:
     """Tests for SensorCategory pin_init_cfg field."""
 
-    def test_pin_init_cfg_defaults_to_empty_dict(self):
+    def test_save_rejects_missing_pin_init_cfg(self):
         """
         GIVEN: no pin_init_cfg value
-        WHEN: creating a SensorCategory without specifying pin_init_cfg
-        THEN: the field defaults to an empty dict
+        WHEN: creating a SensorCategory
+        THEN: a ValidationError is raised on pin_init_cfg (the field has no default)
         """
-        # GIVEN / WHEN
-        category = SensorCategory.objects.create(name="Humidity")
-
-        # THEN
-        assert category.pin_init_cfg == {}
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc_info:
+            SensorCategory.objects.create(name="Humidity")
+        assert "pin_init_cfg" in exc_info.value.message_dict
 
     def test_pin_init_cfg_can_be_updated(self, sensor_category):
         """
-        GIVEN: an existing SensorCategory with an empty pin_init_cfg
+        GIVEN: an existing SensorCategory
         WHEN: updating the pin_init_cfg with new values
         THEN: the new configuration is persisted correctly
         """
         # GIVEN
-        new_cfg = {"mode": "input", "pull": "up"}
+        new_cfg = {"c": "ADC", "a": {"id": "@pin", "atten": "@:ATTN_11DB"}}
 
         # WHEN
         sensor_category.pin_init_cfg = new_cfg
@@ -225,7 +230,7 @@ class TestSensorCategoryPinInitCfg:
         THEN: the nested structure is stored and retrieved correctly
         """
         # GIVEN
-        nested_cfg = {"settings": {"mode": "input", "options": {"pull": "up", "value": 0}}}
+        nested_cfg = {"c": "Pin", "a": {"id": "@pin", "mode": "@:OUT", "opts": {"pull": [1, 2], "value": None}}}
 
         # WHEN
         category = SensorCategory.objects.create(
@@ -236,6 +241,17 @@ class TestSensorCategoryPinInitCfg:
         # THEN
         refreshed = SensorCategory.objects.get(pk=category.pk)
         assert refreshed.pin_init_cfg == nested_cfg
+
+    def test_save_rejects_invalid_pin_init_cfg(self):
+        """
+        GIVEN: a pin_init_cfg without a "@pin" argument
+        WHEN: creating a SensorCategory
+        THEN: a ValidationError is raised on pin_init_cfg (schema cases are covered by the ControllerCategory tests)
+        """
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc_info:
+            SensorCategory.objects.create(name="Humidity", pin_init_cfg={"c": "ADC", "a": {"id": 26}})
+        assert "pin_init_cfg" in exc_info.value.message_dict
 
 
 @pytest.mark.django_db
@@ -504,7 +520,7 @@ class TestSensorUpdate:
         THEN: the category FK is updated correctly in the database
         """
         # GIVEN
-        new_category = SensorCategory.objects.create(name="Humidity", unity_value="%")
+        new_category = SensorCategory.objects.create(name="Humidity", unity_value="%", pin_init_cfg=VALID_PIN_INIT_CFG)
 
         # WHEN
         sensor.category = new_category

@@ -1,7 +1,8 @@
 from gardeniq.base.views import BaseAPIModelViewSet
 from gardeniq.hardware.models import Sensor
 from gardeniq.hardware.models import SensorCategory
-from gardeniq.hardware.serializers import SensorCategoryReadOnlySerializer
+from gardeniq.hardware.serializers import SensorCategoryDetailReadOnlySerializer
+from gardeniq.hardware.serializers import SensorCategoryListReadOnlySerializer
 from gardeniq.hardware.serializers import SensorCategorySerializer
 from gardeniq.hardware.serializers import SensorDetailReadOnlySerializer
 from gardeniq.hardware.serializers import SensorListReadOnlySerializer
@@ -10,7 +11,8 @@ from gardeniq.hardware.serializers import SensorSerializer
 
 class SensorCategoryAPIModelView(BaseAPIModelViewSet):
     serializer_class = SensorCategorySerializer
-    detail_serializer_class = SensorCategoryReadOnlySerializer
+    list_serializer_class = SensorCategoryListReadOnlySerializer
+    detail_serializer_class = SensorCategoryDetailReadOnlySerializer
     queryset = SensorCategory.objects.all()
 
 

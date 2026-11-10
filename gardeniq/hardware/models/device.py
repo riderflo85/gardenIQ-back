@@ -76,9 +76,11 @@ class Device(NameMixinModel, OptionalDescriptionMixinModel):
         related_name="devices",
         verbose_name="device category",
     )
+    # null=True: an unknown uid is NULL, not "", so several devices without uid do not break `unique`.
     uid = models.CharField(
         max_length=32,
         unique=True,
+        null=True,
         blank=True,
         verbose_name="device uid",
         help_text="Unique device card UID (e.g: '12AB34567890DEAD').",

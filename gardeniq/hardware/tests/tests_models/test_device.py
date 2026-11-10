@@ -2,6 +2,8 @@ from enum import Enum
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
+from django.db import transaction
 from django.db.models import ProtectedError
 from django.db.models import QuerySet
 
@@ -154,6 +156,39 @@ class TestDeviceModel:
         # THEN
         save_mock.assert_not_called()
         check_mock.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestDeviceUid:
+
+    def test_uid_defaults_to_none(self, device_status, device_category):
+        """A device created without uid stores NULL, not an empty string."""
+        # GIVEN / WHEN
+        device = Device.objects.create(name="Card", category=device_category, status=device_status)
+
+        # THEN
+        device.refresh_from_db()
+        assert device.uid is None
+
+    def test_several_devices_without_uid_are_allowed(self, device_status, device_category):
+        """Several devices without uid do not break the uniqueness of uid."""
+        # GIVEN
+        Device.objects.create(name="Card 1", category=device_category, status=device_status)
+
+        # WHEN
+        Device.objects.create(name="Card 2", category=device_category, status=device_status)
+
+        # THEN
+        assert Device.objects.filter(uid__isnull=True).count() == 2
+
+    def test_uid_is_unique_when_set(self, device_status, device_category):
+        """Two devices cannot share the same uid."""
+        # GIVEN
+        Device.objects.create(name="Card 1", uid="12AB34567890DEAD", category=device_category, status=device_status)
+
+        # WHEN / THEN
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Device.objects.create(name="Card 2", uid="12AB34567890DEAD", category=device_category, status=device_status)
 
 
 VALID_PINS_CONFIGURATION = {

@@ -1,6 +1,6 @@
 # Modèle de données
 
-Dernière vérification : 2026-11-10 · commit « (TK-74)(enh) - hardware: Make channel names unique and pin channel_choiced optional » · branche `(TK-74)-Update-device-object`
+Dernière vérification : 2026-11-10 · commit « (TK-74)(fix) - hardware: Store a missing device uid as NULL instead of an empty string » · branche `(TK-74)-Update-device-object`
 
 Diagramme relationnel des modèles Django du projet (apps `base`, `hardware`, `orderlg`, `users` ; `telemetry` n'a pas encore de modèle). Il est construit à la lecture de `gardeniq/<app>/models/` : les champs hérités des mixins abstraits de `base/models/mixins.py` sont dépliés dans chaque table, et chaque table a une clé primaire `id` automatique.
 
@@ -32,7 +32,7 @@ erDiagram
         varchar name
         text description "optionnel"
         int category_id FK
-        varchar uid UK "vide autorisé"
+        varchar uid UK "nullable"
         varchar communication_protocol "USB"
         varchar path "optionnel"
         datetime last_seen "auto_now"

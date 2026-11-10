@@ -104,6 +104,28 @@ class TestDeviceSerializer:
         assert device.status == status_device
         assert device.uid == "12AB34567890DEAD"
 
+    def test_create_several_devices_without_uid(self, mock_serial_ports, status_device, device_category):
+        """The API never sends a uid: several devices created this way are saved with a NULL uid."""
+        # GIVEN
+        data = {
+            "path": "/dev/ttyUSB0",
+            "status": status_device.pk,
+            "category": device_category.pk,
+            "communication_protocol": "USB",
+        }
+        first = DeviceSerializer(data={**data, "name": "Garden Sensor 1"})
+        assert first.is_valid(), first.errors
+        first.save()
+
+        # WHEN
+        second = DeviceSerializer(data={**data, "name": "Garden Sensor 2"})
+        assert second.is_valid(), second.errors
+        second.save()
+
+        # THEN
+        assert list(Device.objects.values_list("uid", flat=True)) == [None, None]
+        assert second.data["uid"] is None
+
     def test_create_device_without_description(self, mock_serial_ports, status_device, device_category):
         # GIVEN
         data = {

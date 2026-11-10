@@ -87,6 +87,19 @@ class TestChannelCreation:
         assert channel.pk is not None
         assert channel.description == "Pulse-width modulation channel"
 
+    def test_name_is_unique(self):
+        """
+        GIVEN: a Channel with a given name
+        WHEN: creating another Channel with the same name
+        THEN: the database refuses it
+        """
+        # GIVEN
+        Channel.objects.create(name="Digital")
+
+        # WHEN / THEN
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Channel.objects.create(name="Digital")
+
     def test_create_multiple_channels(self):
         """
         GIVEN: data for multiple Channels
@@ -309,6 +322,19 @@ class TestPinCreation:
         assert p.device == device
         assert p.channel_choiced == channel
         assert p.pin_number == 1
+
+    def test_create_pin_without_channel_choiced(self, device):
+        """
+        GIVEN: a Device and a pin_number
+        WHEN: creating a Pin without channel_choiced
+        THEN: the Pin is created and channel_choiced is empty
+        """
+        # GIVEN / WHEN
+        p = Pin.objects.create(device=device, pin_number=1)
+
+        # THEN
+        p.refresh_from_db()
+        assert p.channel_choiced is None
 
     def test_create_pin_with_channels_available(self, device, channel):
         """

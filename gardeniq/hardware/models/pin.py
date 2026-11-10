@@ -1,20 +1,24 @@
 from django.db import models
 
-from gardeniq.base.models import NameMixinModel
 from gardeniq.base.models import OptionalDescriptionMixinModel
 from gardeniq.base.models import SeederMixinModel
 
 from .device import Device
 
 
-class Channel(NameMixinModel, OptionalDescriptionMixinModel, SeederMixinModel):
+class Channel(OptionalDescriptionMixinModel, SeederMixinModel):
     """
     Inherited fields:
-      - `name`
       - `description`:optional
       - `seed_id`
       - `is_ready`
     """
+
+    name = models.CharField(
+        max_length=255,
+        unique=True,
+        verbose_name="name",
+    )
 
     class Meta:
         verbose_name = "channel"
@@ -35,6 +39,7 @@ class Pin(models.Model):
     channel_choiced = models.ForeignKey(
         Channel,
         on_delete=models.PROTECT,
+        null=True,
         related_name="choiced_pins",
         verbose_name="channel",
     )

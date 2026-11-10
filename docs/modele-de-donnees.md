@@ -1,6 +1,6 @@
 # Modèle de données
 
-Dernière vérification : 2026-10-29 · commit « (TK-74)(enh) - hardware: Add a seeder for channels » · branche `(TK-74)-Update-device-object`
+Dernière vérification : 2026-11-10 · commit « (TK-74)(enh) - hardware: Make channel names unique and pin channel_choiced optional » · branche `(TK-74)-Update-device-object`
 
 Diagramme relationnel des modèles Django du projet (apps `base`, `hardware`, `orderlg`, `users` ; `telemetry` n'a pas encore de modèle). Il est construit à la lecture de `gardeniq/<app>/models/` : les champs hérités des mixins abstraits de `base/models/mixins.py` sont dépliés dans chaque table, et chaque table a une clé primaire `id` automatique.
 
@@ -44,7 +44,7 @@ erDiagram
 
     Channel {
         int id PK
-        varchar name
+        varchar name UK
         text description "optionnel"
         bigint seed_id UK "nullable"
         bool is_ready
@@ -53,7 +53,7 @@ erDiagram
     Pin {
         int id PK
         int device_id FK "UK avec pin_number"
-        int channel_choiced_id FK
+        int channel_choiced_id FK "nullable"
         int pin_number "UK avec device_id"
     }
 
@@ -117,7 +117,7 @@ erDiagram
     DeviceCategory ||--o{ Device : "category PROTECT"
     Status ||--o{ Device : "status PROTECT, tag device"
     Device ||--o{ Pin : "device CASCADE"
-    Channel ||--o{ Pin : "channel_choiced PROTECT"
+    Channel |o--o{ Pin : "channel_choiced PROTECT"
     Channel }o--o{ Pin : "channels_available M2M"
     ControllerCategory ||--o{ Controller : "category PROTECT"
     Pin ||--o| Controller : "pin PROTECT, 1-1"
@@ -147,7 +147,7 @@ Les tables ci-dessus reçoivent leurs champs communs de ces mixins (`base/models
 
 | Mixin | Champs | Utilisé par |
 |---|---|---|
-| `NameMixinModel` | `name` | toutes les tables du projet sauf `Pin` et `CustomUser` |
+| `NameMixinModel` | `name` | toutes les tables du projet sauf `Pin`, `Channel` (son propre `name`, unique) et `CustomUser` |
 | `OptionalDescriptionMixinModel` / `DescriptionMixinModel` | `description` (optionnelle / obligatoire) | `Status`, `DeviceCategory`, `Device`, `Channel` / `Order` |
 | `SeederMixinModel` | `seed_id`, `is_ready` | `Status`, `DeviceCategory`, `Channel`, `ControllerCategory`, `SensorCategory`, `Order` |
 | `SlugMixinModel` | `slug` | `Order` |

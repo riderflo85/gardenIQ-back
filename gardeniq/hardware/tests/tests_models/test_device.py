@@ -3,17 +3,28 @@ from enum import Enum
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db.models import ProtectedError
+from django.db.models import QuerySet
 
 import pytest
 
 from gardeniq.base.models import Status
+from gardeniq.hardware.fixtures.seeders import ChannelSeeder
+from gardeniq.hardware.fixtures.seeders import DeviceCategorySeeder
+from gardeniq.hardware.models import Channel
 from gardeniq.hardware.models import Device
 from gardeniq.hardware.models import DeviceCategory
+from gardeniq.hardware.models import Pin
 
 
 @pytest.fixture
 def device_status(db):
     return Status.objects.create(name="Generic", tag="device-generic", color="#123456")
+
+
+@pytest.fixture
+def channels(db):
+    """Create the channels the datasheets of these tests list: saving a device creates its pins from them."""
+    return {name: Channel.objects.create(name=name) for name in ("digit", "analog", "pwm", "i2c")}
 
 
 @pytest.fixture
@@ -154,7 +165,7 @@ VALID_PINS_CONFIGURATION = {
 
 
 @pytest.fixture
-def device_category(db):
+def device_category(channels):
     return DeviceCategory.objects.create(name="Raspberry Pi Pico", pins_configuration=VALID_PINS_CONFIGURATION)
 
 
@@ -239,3 +250,273 @@ class TestDeviceCategoryModel:
 
         # WHEN / THEN
         assert list(device_category.devices.all()) == [device]
+
+
+DATASHEET = {
+    "available_channels": ["digit", "analog", "pwm"],
+    "digits": [{"name": "GP0", "pins": [0]}, {"name": "GP26", "pins": [26]}],
+    "pwms": [{"name": "PWM0", "pins": [0]}],
+    "analogs": [{"name": "ADC0", "pins": [26]}],
+}
+
+EMPTY_DATASHEET = {"available_channels": [], "digits": [], "pwms": [], "analogs": []}
+
+
+def available_channels_by_pin(device):
+    """Return {pin_number: sorted names of its available channels} for the pins of a device."""
+    return {
+        pin.pin_number: sorted(channel.name for channel in pin.channels_available.all())
+        for pin in Pin.objects.filter(device=device)
+    }
+
+
+@pytest.mark.django_db
+class TestDeviceCreatePinsWithDatasheet:
+
+    @pytest.fixture
+    def create_device(self, device_status):
+        """
+        Return a function that creates a device whose category holds the given datasheet.
+
+        `save()` creates the pins of a new device, so the device is saved with an empty datasheet (no pin) and the
+        datasheet under test is only assigned afterwards: each test then calls `_create_pins_with_datasheet()` itself.
+        """
+
+        def _create_device(pins_configuration, uid="AABBCCDDEEFF0011"):
+            empty_category = DeviceCategory.objects.create(name=f"Empty {uid}", pins_configuration=EMPTY_DATASHEET)
+            device = Device.objects.create(name=f"Card {uid}", uid=uid, category=empty_category, status=device_status)
+            device.category = DeviceCategory.objects.create(
+                name=f"Category {uid}", pins_configuration=pins_configuration
+            )
+            return device
+
+        return _create_device
+
+    def test_creates_one_pin_per_pin_number_with_its_available_channels(self, channels, create_device):
+        """Each pin number of the datasheet becomes a Pin, available on the channels that list it."""
+        # GIVEN
+        device = create_device(DATASHEET)
+
+        # WHEN
+        device._create_pins_with_datasheet()
+
+        # THEN
+        assert available_channels_by_pin(device) == {0: ["digit", "pwm"], 26: ["analog", "digit"]}
+
+    def test_leaves_channel_choiced_empty(self, channels, create_device):
+        """The channel of a created pin is chosen later: channel_choiced stays empty."""
+        # GIVEN
+        device = create_device(DATASHEET)
+
+        # WHEN
+        device._create_pins_with_datasheet()
+
+        # THEN
+        assert Pin.objects.filter(device=device).count() == 2
+        assert not Pin.objects.filter(device=device, channel_choiced__isnull=False).exists()
+
+    def test_does_not_create_pins_for_other_devices(self, channels, create_device):
+        """Only the pins of the device on which the method runs are created."""
+        # GIVEN
+        device = create_device(DATASHEET)
+        other_device = create_device(DATASHEET, uid="1122334455667788")
+
+        # WHEN
+        device._create_pins_with_datasheet()
+
+        # THEN
+        assert Pin.objects.filter(device=device).exists()
+        assert not Pin.objects.filter(device=other_device).exists()
+
+    def test_ignores_channels_missing_from_available_channels(self, channels, create_device):
+        """A channel type that is not in available_channels is ignored, even if the datasheet lists pins for it."""
+        # GIVEN
+        pins_configuration = {**DATASHEET, "available_channels": ["digit"], "pwms": [{"name": "PWM5", "pins": [5]}]}
+        device = create_device(pins_configuration)
+
+        # WHEN
+        device._create_pins_with_datasheet()
+
+        # THEN
+        assert available_channels_by_pin(device) == {0: ["digit"], 26: ["digit"]}
+
+    def test_every_pin_of_a_multi_pin_channel_gets_the_channel(self, channels, create_device):
+        """A channel wired to several pins (I2C: SDA and SCL) is available on each of them."""
+        # GIVEN
+        pins_configuration = {**DATASHEET, "available_channels": ["i2c"], "i2cs": [{"name": "I2C0", "pins": [0, 1]}]}
+        device = create_device(pins_configuration)
+
+        # WHEN
+        device._create_pins_with_datasheet()
+
+        # THEN
+        assert available_channels_by_pin(device) == {0: ["i2c"], 1: ["i2c"]}
+
+    def test_pin_listed_several_times_for_a_channel_gets_it_once(self, channels, create_device):
+        """A pin repeated in the datasheet for the same channel type is linked to that channel only once."""
+        # GIVEN
+        pins_configuration = {
+            **DATASHEET,
+            "available_channels": ["digit"],
+            "digits": [{"name": "GP26", "pins": [26, 26]}, {"name": "GP26 bis", "pins": [26]}],
+        }
+        device = create_device(pins_configuration)
+
+        # WHEN
+        device._create_pins_with_datasheet()
+
+        # THEN
+        assert available_channels_by_pin(device) == {26: ["digit"]}
+
+    @pytest.mark.parametrize(
+        "pins_configuration",
+        [
+            {"available_channels": [], "digits": [], "pwms": [], "analogs": []},
+            {"available_channels": ["digit"], "digits": [], "pwms": [], "analogs": []},
+        ],
+        ids=["no-channel", "channel-without-pin"],
+    )
+    def test_creates_nothing_when_datasheet_lists_no_pin(self, channels, create_device, pins_configuration):
+        """A datasheet without any pin to create leaves the device without pins."""
+        # GIVEN
+        device = create_device(pins_configuration)
+
+        # WHEN
+        device._create_pins_with_datasheet()
+
+        # THEN
+        assert not Pin.objects.exists()
+
+    def test_second_run_gives_the_same_pins(self, channels, create_device):
+        """Running the method again keeps the same pins and links, without error."""
+        # GIVEN
+        device = create_device(DATASHEET)
+        device._create_pins_with_datasheet()
+        pin_ids = set(Pin.objects.filter(device=device).values_list("pk", flat=True))
+
+        # WHEN
+        device._create_pins_with_datasheet()
+
+        # THEN
+        assert set(Pin.objects.filter(device=device).values_list("pk", flat=True)) == pin_ids
+        assert available_channels_by_pin(device) == {0: ["digit", "pwm"], 26: ["analog", "digit"]}
+
+    def test_existing_pin_is_reused_and_its_channels_refreshed(self, channels, create_device):
+        """A pin already created is kept, with its chosen channel, and gets the channels of the datasheet."""
+        # GIVEN
+        device = create_device(DATASHEET)
+        existing_pin = Pin.objects.create(device=device, pin_number=26, channel_choiced=channels["digit"])
+        existing_pin.channels_available.set([channels["pwm"]])
+
+        # WHEN
+        device._create_pins_with_datasheet()
+
+        # THEN
+        refreshed_pin = Pin.objects.get(device=device, pin_number=26)
+        assert refreshed_pin.pk == existing_pin.pk
+        assert refreshed_pin.channel_choiced == channels["digit"]
+        assert available_channels_by_pin(device)[26] == ["analog", "digit"]
+
+    def test_pin_missing_from_datasheet_is_left_untouched(self, channels, create_device):
+        """A pin of the device that the datasheet does not list is neither deleted nor changed."""
+        # GIVEN
+        device = create_device(DATASHEET)
+        extra_pin = Pin.objects.create(device=device, pin_number=99)
+        extra_pin.channels_available.set([channels["pwm"]])
+
+        # WHEN
+        device._create_pins_with_datasheet()
+
+        # THEN
+        assert available_channels_by_pin(device) == {0: ["digit", "pwm"], 26: ["analog", "digit"], 99: ["pwm"]}
+
+    def test_raises_when_a_channel_is_not_in_database(self, create_device):
+        """A channel of available_channels that is not in the database is an error, not a channel to create."""
+        # GIVEN
+        Channel.objects.create(name="digit")
+        device = create_device(DATASHEET)
+
+        # WHEN / THEN
+        with pytest.raises(Channel.DoesNotExist) as exc_info:
+            device._create_pins_with_datasheet()
+        assert "['analog', 'pwm']" in str(exc_info.value)
+        assert str(device.category) in str(exc_info.value)
+        assert Channel.objects.count() == 1
+        assert not Pin.objects.exists()
+
+    def test_writes_nothing_when_a_step_fails(self, channels, create_device, mocker):
+        """A failure after the pins are created rolls them back: the method runs in one transaction."""
+        # GIVEN
+        device = create_device(DATASHEET)
+        real_bulk_create = QuerySet.bulk_create
+        calls = []
+
+        def fail_on_second_call(queryset, objs, *args, **kwargs):
+            calls.append(queryset.model)
+            if len(calls) == 2:
+                raise RuntimeError("boom")
+            return real_bulk_create(queryset, objs, *args, **kwargs)
+
+        mocker.patch.object(QuerySet, "bulk_create", fail_on_second_call)
+
+        # WHEN / THEN
+        with pytest.raises(RuntimeError, match="boom"):
+            device._create_pins_with_datasheet()
+        assert len(calls) == 2
+        assert not Pin.objects.exists()
+
+
+@pytest.mark.django_db
+class TestDeviceSave:
+
+    @pytest.fixture
+    def category(self, db):
+        return DeviceCategory.objects.create(name="Category", pins_configuration=DATASHEET)
+
+    def test_creation_creates_the_pins_of_the_datasheet(self, channels, category, device_status):
+        """Creating a device creates the pins listed in the datasheet of its category."""
+        # GIVEN / WHEN
+        device = Device.objects.create(name="Card", uid="AABBCCDDEEFF0011", category=category, status=device_status)
+
+        # THEN
+        assert available_channels_by_pin(device) == {0: ["digit", "pwm"], 26: ["analog", "digit"]}
+
+    def test_update_does_not_create_pins_again(self, channels, category, device_status):
+        """Saving an existing device does not run the datasheet again: a deleted pin is not recreated."""
+        # GIVEN
+        device = Device.objects.create(name="Card", uid="AABBCCDDEEFF0011", category=category, status=device_status)
+        Pin.objects.filter(device=device, pin_number=26).delete()
+
+        # WHEN
+        device.name = "Renamed card"
+        device.save()
+
+        # THEN
+        assert sorted(available_channels_by_pin(device)) == [0]
+
+    def test_creation_with_unknown_channel_creates_no_device(self, category, device_status):
+        """A datasheet channel missing from the database cancels the creation: no device and no pin."""
+        # GIVEN - no Channel in database
+
+        # WHEN / THEN
+        with pytest.raises(Channel.DoesNotExist):
+            Device.objects.create(name="Card", uid="AABBCCDDEEFF0011", category=category, status=device_status)
+        assert not Device.objects.exists()
+        assert not Pin.objects.exists()
+
+    def test_seeded_pico_gets_its_29_pins(self, device_status):
+        """With the seeded channels and the seeded Raspberry Pi Pico, a new device gets its 29 pins."""
+        # GIVEN
+        ChannelSeeder(success_logger=lambda msg: None, error_logger=lambda msg: None).seed()
+        DeviceCategorySeeder(success_logger=lambda msg: None, error_logger=lambda msg: None).seed()
+        pico = DeviceCategory.objects.get(seed_id=1)
+
+        # WHEN
+        device = Device.objects.create(name="Pico", uid="AABBCCDDEEFF0011", category=pico, status=device_status)
+
+        # THEN
+        channels_by_pin = available_channels_by_pin(device)
+        assert sorted(channels_by_pin) == list(range(29))
+        assert channels_by_pin[0] == ["digit", "pwm"]
+        assert [number for number, names in channels_by_pin.items() if "analog" in names] == [26, 27, 28]
+        assert channels_by_pin[26] == ["analog", "digit", "pwm"]

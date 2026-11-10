@@ -1,6 +1,7 @@
 import pytest
 
 from gardeniq.base.models import Status
+from gardeniq.hardware.models import Channel
 from gardeniq.hardware.models import Device
 from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.serializers import DeviceCategoryDetailReadOnlySerializer
@@ -448,7 +449,13 @@ VALID_PINS_CONFIGURATION = {
 
 
 @pytest.fixture
-def device_category(db):
+def digit_channel(db):
+    """Create the channel the datasheet below lists: saving a device creates its pins from it."""
+    return Channel.objects.create(name="digit")
+
+
+@pytest.fixture
+def device_category(digit_channel):
     return DeviceCategory.objects.create(
         name="Pico", description="Pico board", pins_configuration=VALID_PINS_CONFIGURATION
     )

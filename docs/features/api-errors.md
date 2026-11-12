@@ -1,6 +1,8 @@
 # Feature : format d'erreur de l'API
 
-Dernière vérification : 2026-11-10 · efad44b
+Dernière vérification : 2026-11-12 · 8760dab
+
+Copie Notion : [Format d'erreur de l'API (back)](https://app.notion.com/p/41654287aae081609229f4faeb6eed33).
 
 ## Résumé
 

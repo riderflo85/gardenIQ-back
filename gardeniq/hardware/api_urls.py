@@ -4,6 +4,7 @@ from gardeniq.hardware.views import ChannelAPIModelView
 from gardeniq.hardware.views import ControllerAPIModelView
 from gardeniq.hardware.views import ControllerCategoryAPIModelView
 from gardeniq.hardware.views import DeviceAPIModelView
+from gardeniq.hardware.views import DeviceCategoryAPIModelView
 from gardeniq.hardware.views import PinAPIModelView
 from gardeniq.hardware.views import SensorAPIModelView
 from gardeniq.hardware.views import SensorCategoryAPIModelView
@@ -15,6 +16,11 @@ router.register(
     r"devices",
     DeviceAPIModelView,
     basename="devices",
+)
+router.register(
+    r"device-categories",
+    DeviceCategoryAPIModelView,
+    basename="device-categories",
 )
 router.register(
     r"controllers",

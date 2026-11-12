@@ -69,7 +69,7 @@ class TestLoginView(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "non_field_errors" in response.data
+        assert "non_field_errors" in response.data["errors"]
 
     def test_login_with_invalid_password(self, api_client, regular_user):
         """Test login with incorrect password fails."""
@@ -83,7 +83,7 @@ class TestLoginView(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "non_field_errors" in response.data
+        assert "non_field_errors" in response.data["errors"]
 
     def test_login_with_missing_username(self, api_client):
         """Test login without username fails."""
@@ -97,7 +97,7 @@ class TestLoginView(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "username" in response.data
+        assert "username" in response.data["errors"]
 
     def test_login_with_missing_password(self, api_client):
         """Test login without password fails."""
@@ -111,7 +111,7 @@ class TestLoginView(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "password" in response.data
+        assert "password" in response.data["errors"]
 
     def test_login_with_empty_credentials(self, api_client):
         """Test login with empty credentials fails."""
@@ -125,8 +125,8 @@ class TestLoginView(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "username" in response.data
-        assert "password" in response.data
+        assert "username" in response.data["errors"]
+        assert "password" in response.data["errors"]
 
     def test_login_with_inactive_user(self, api_client, regular_user):
         """Test login with inactive user fails."""
@@ -424,7 +424,8 @@ class TestTokenLimitAndExpiry(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_403_FORBIDDEN
-        assert response.data["error"] == "Maximum amount of tokens allowed per user exceeded."
+        assert response.data["code"] == "permission_denied"
+        assert response.data["message"] == "Maximum amount of tokens allowed per user exceeded."
         assert AuthToken.objects.filter(user=regular_user).count() == knox_settings.TOKEN_LIMIT_PER_USER
 
     def test_logout_frees_a_token_slot(self, api_client, regular_user):
@@ -469,7 +470,8 @@ class TestTokenLimitAndExpiry(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
-        assert str(response.data["detail"]) == "Invalid token."
+        assert response.data["code"] == "authentication_failed"
+        assert response.data["message"] == "Invalid token."
 
     def test_token_lifetime_matches_the_configured_ttl(self, api_client, regular_user):
         """Test that a new token expires TOKEN_TTL after its creation."""

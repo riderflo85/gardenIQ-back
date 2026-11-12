@@ -21,10 +21,10 @@ class SeedersManager:
         Append result to container.
         """
         for model_obj in apps.get_app_config(app_name).get_models():
-            model_name = model_obj._meta.model_name
+            model_name = model_obj.__name__
             # model_name is str or None
             if model_name:
-                potential_seeder = f"{model_name.title()}Seeder"
+                potential_seeder = f"{model_name}Seeder"
                 container.append(potential_seeder)
 
     def _import_seeders_module(self, app_name: str, potential_seeders: List[str]) -> bool:

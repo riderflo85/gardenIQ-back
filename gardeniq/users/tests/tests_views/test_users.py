@@ -215,7 +215,7 @@ class TestUserAPIModelViewCreate(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "password" in response.data
+        assert "password" in response.data["errors"]
 
     def test_create_user_without_password_confirm_fails(self, admin_client, user_payload):
         """Test that creating user without password confirmation fails."""
@@ -229,7 +229,7 @@ class TestUserAPIModelViewCreate(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "password_confirm" in response.data
+        assert "password_confirm" in response.data["errors"]
 
     def test_create_user_with_mismatched_passwords_fails(self, admin_client, user_payload):
         """Test that creating user with mismatched passwords fails."""
@@ -243,7 +243,7 @@ class TestUserAPIModelViewCreate(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "password_confirm" in response.data
+        assert "password_confirm" in response.data["errors"]
 
     def test_create_user_with_duplicate_username_fails(self, admin_client, user_payload, regular_user):
         """Test that creating user with duplicate username fails."""
@@ -257,7 +257,7 @@ class TestUserAPIModelViewCreate(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "username" in response.data
+        assert "username" in response.data["errors"]
 
     def test_create_user_with_duplicate_email_fails(self, admin_client, user_payload, regular_user):
         """Test that creating user with duplicate email fails."""
@@ -271,7 +271,7 @@ class TestUserAPIModelViewCreate(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "email" in response.data
+        assert "email" in response.data["errors"]
 
     def test_create_user_with_short_password_fails(self, admin_client, user_payload):
         """Test that creating user with short password fails."""
@@ -286,7 +286,7 @@ class TestUserAPIModelViewCreate(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "password" in response.data
+        assert "password" in response.data["errors"]
 
     def test_create_user_with_invalid_email_fails(self, admin_client, user_payload):
         """Test that creating user with invalid email fails."""
@@ -300,7 +300,7 @@ class TestUserAPIModelViewCreate(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "email" in response.data
+        assert "email" in response.data["errors"]
 
 
 @pytest.mark.django_db
@@ -427,7 +427,7 @@ class TestUserAPIModelViewUpdate(ViewSetTestMixin):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "username" in response.data
+        assert "username" in response.data["errors"]
 
 
 @pytest.mark.django_db
@@ -504,7 +504,7 @@ class TestUserAPIModelViewPermissions(ViewSetTestMixin):
         # THEN
         # The validation should fail at serializer level
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "group_ids" in response.data
+        assert "group_ids" in response.data["errors"]
 
     def test_regular_user_cannot_assign_permissions(self, authenticated_client, regular_user, test_permission):
         """Test that regular user cannot assign permissions to themselves."""
@@ -519,4 +519,4 @@ class TestUserAPIModelViewPermissions(ViewSetTestMixin):
         # THEN
         # The validation should fail at serializer level
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "permission_ids" in response.data
+        assert "permission_ids" in response.data["errors"]

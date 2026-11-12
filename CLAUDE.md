@@ -11,8 +11,8 @@ Tout passe par un environnement de dev pipenv: `pipenv shell`. Les commandes dja
 | Lint (écrit les corrections) | `black gardeniq` `isort .` `flake8 .` (`black` seul échoue : il faut un chemin) |
 | Lint comme la CI (sans écrire) | `black --check gardeniq` `isort --check-only --diff .` `flake8 .` |
 | Tous les hooks pre-commit | `pre-commit run --all-files` |
-| Tests | `pytest [options pytest]` (544 tests, ~2 min) |
-| Tests plus rapides | réutilise la base de test, `--reuse-db`, `-x` (stoppe au premier échec), parallélisation des tests avec `-n auto` (utilise pytest-xdist, ~35 s) |
+| Tests | `pytest [options pytest]` (728 tests, ~2 min) |
+| Tests plus rapides | réutilise la base de test, `--reuse-db`, `-x` (stoppe au premier échec), parallélisation des tests avec `-n auto` (utilise pytest-xdist, ~45 s) |
 | Un test précis | `pytest [options pytest] -- gardeniq/<app>/tests/<dossier>/<fichier>.py::<test>` |
 | Couverture (comme la CI) | `pytest --cov=. --cov-report=term-missing` |
 | Serveur, shell | `pipenv run server`, `pipenv run shell` (`shell_plus`) |
@@ -32,9 +32,10 @@ Les règles à ne jamais enfreindre :
 - Les modules `utils` n'importent ni modèle, ni serializer, ni vue de `gardeniq` en tête de fichier (import dans le corps de la fonction).
 - Chaque app expose ses routes dans `api_urls.py` (router DRF), inclus dans `gardeniq/urls.py` sous `api/`. `ToggleObjectRouter` (`base/routers.py`) ajoute `enable/` et `disable/`.
 - Les vues héritent de `BaseAPIModelViewSet` (`base/views/base.py`) : `serializer_class` (écriture), `detail_serializer_class` (retrieve) et `list_serializer_class` (list, optionnel). `DisableAPIViewMixin` pour enable/disable.
+- Filtres de liste : `FilterAPIViewMixin` (`base/views/mixins.py`, django-filter) en tête des parents de la vue, avec `filterset_fields` pour un filtre simple ou `filterset_class` (FilterSet dans `<app>/filters.py`) pour un champ calculé ou une relation traversée (ex. `?device=` de `/api/sensors/` via `pin__device`).
 - Les serializers héritent de `BaseSerializer` (`base/serializers/bases.py`) avec `Meta.model` et les `*MixinSerializer` de `base/serializers/mixins.py` ; pas de `ModelSerializer`. Lecture seule : `ReadOnlySerializer`.
 - Les modèles réutilisent les mixins abstraits de `base/models/mixins.py` (`Slug`, `Name`, `Description`, `ProtectedDisabled`, `ProtectedDeleted`, `Seeder`…). Les suppressions/désactivations protégées lèvent les exceptions de `base/exceptions.py`.
-- Les erreurs attendues sont gérées explicitement dans la vue ; `APIException` en dernier recours.
+- Les erreurs de l'API passent par le gestionnaire global `base/exception_handler.py` (`REST_FRAMEWORK["EXCEPTION_HANDLER"]`), qui donne à toute erreur le corps `{"status", "code", "message", "errors"}` : lever l'exception (DRF, Django ou `base/exceptions.py`), sans `try/except` ni `Response` d'erreur à la main dans la vue. Détail dans `.claude/rules/api.md`.
 - Une `Meta` qui combine des parents hérite explicitement de leurs `Meta` quand ils y définissent des attributs (ex. `class Meta(BaseSerializer.Meta, AutocompleteSlugMixinSerializer.Meta)` dans `orderlg/serializers/order.py`). Les `Meta` des modèles Django n'héritent pas.
 - Tests de vues : hériter de `ViewSetTestMixin` (`base/utils/tests.py`, `MODEL`, `BASE_PATTERN`, `DATA_TO_DEFAULT_OBJ`). Il n'y a pas de factories.
 
@@ -73,6 +74,8 @@ Hooks : `.git/hooks/pre-commit` est le framework `pre-commit` (`pre-commit insta
 ## Documentation
 
 La documentation de référence vit dans `docs/features/` et `docs/runbooks/` (Markdown, diagrammes Mermaid).
+
+`docs/modele-de-donnees.md` est le diagramme relationnel de tous les modèles Django. Tout ajout, modification ou suppression d'un modèle, d'un champ ou d'une relation le met à jour dans le même commit, puis met à jour sa copie Notion « Modèle de données (back) » (dossier « Documentations technique », https://app.notion.com/p/40854287aae081ddbe8bc4931f6c4822) : même contenu, ligne « Dernière vérification » comprise. Cette ligne donne la date, le titre du commit qui porte la mise à jour et la branche, sans hash (le hash n'existe pas encore au moment du commit) : `Dernière vérification : <date> · commit « <titre complet> » · branche <branche>`. Le fichier du dépôt est la source ; l'écriture dans Notion se confirme comme toute écriture Notion.
 
 ## Notion (kanban des tickets)
 

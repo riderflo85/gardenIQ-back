@@ -8,10 +8,13 @@ from gardeniq.hardware.models import Channel
 from gardeniq.hardware.models import Controller
 from gardeniq.hardware.models import ControllerCategory
 from gardeniq.hardware.models import Device
+from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
 from gardeniq.hardware.models import Sensor
 from gardeniq.hardware.models import SensorCategory
 from gardeniq.orderlg.models import Order
+
+VALID_PIN_INIT_CFG = {"c": "Pin", "a": {"id": "@pin"}}
 
 # ─── Order View Tests ──────────────────────────────────────────────────────────
 
@@ -27,12 +30,20 @@ class OrderViewSetTestConf(ViewSetTestMixin):
         return Status.objects.create(name="Generic", tag="device-generic", color="#123456")
 
     @pytest.fixture
-    def device(self, device_status):
+    def device_category(self):
+        return DeviceCategory.objects.create(
+            name="Test Category",
+            pins_configuration={"available_channels": [], "digits": [], "pwms": [], "analogs": []},
+        )
+
+    @pytest.fixture
+    def device(self, device_status, device_category):
         return Device.objects.create(
             name="Test Device",
             uid="AABBCCDDEEFF0011",
             path="/dev/ttyUSB0",
             status=device_status,
+            category=device_category,
         )
 
     @pytest.fixture
@@ -53,27 +64,25 @@ class OrderViewSetTestConf(ViewSetTestMixin):
 
     @pytest.fixture
     def sensor_category(self, db):
-        return SensorCategory.objects.create(name="Temperature", unity_value="°C")
+        return SensorCategory.objects.create(name="Temperature", unity_value="°C", pin_init_cfg=VALID_PIN_INIT_CFG)
 
     @pytest.fixture
     def sensor(self, sensor_category, device, pin):
         return Sensor.objects.create(
             name="Main Temp Sensor",
             category=sensor_category,
-            device=device,
             pin=pin,
         )
 
     @pytest.fixture
     def controller_category(self, db):
-        return ControllerCategory.objects.create(name="Relay")
+        return ControllerCategory.objects.create(name="Relay", pin_init_cfg=VALID_PIN_INIT_CFG)
 
     @pytest.fixture
     def controller(self, controller_category, device, pin2):
         return Controller.objects.create(
             name="Main Relay",
             category=controller_category,
-            device=device,
             pin=pin2,
         )
 
@@ -341,3 +350,42 @@ class TestOrderAPIModelView(OrderViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+
+@pytest.mark.django_db
+class TestOrderAPIModelViewFilters(OrderViewSetTestConf):
+
+    @pytest.mark.parametrize("field, expected_index", [("action_type", 0), ("sensor", 0), ("controller", 1)])
+    def test_list_filters(self, authenticated_client, obj, field, expected_index):
+        """
+        GIVEN: a getter Order on a Sensor and a setter Order on a Controller
+        WHEN: listing with ?<field>= of one of them
+        THEN: only that Order is returned
+        """
+        # GIVEN
+        expected = obj[expected_index]
+        value = getattr(expected, field)
+
+        # WHEN
+        response = authenticated_client.get(self.get_url_list(), {field: getattr(value, "pk", value)})
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+        assert [item["id"] for item in response.data["results"]] == [expected.pk]
+
+    def test_list_filters_by_is_enabled(self, authenticated_client, obj):
+        """
+        GIVEN: two Orders, one disabled
+        WHEN: listing with ?is_enabled=false
+        THEN: only the disabled Order is returned
+        """
+        # GIVEN
+        order1, _ = obj
+        Order.objects.filter(pk=order1.pk).update(is_enabled=False)
+
+        # WHEN
+        response = authenticated_client.get(self.get_url_list(), {"is_enabled": "false"})
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+        assert [item["id"] for item in response.data["results"]] == [order1.pk]

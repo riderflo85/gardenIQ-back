@@ -4,6 +4,7 @@ import pytest
 
 from gardeniq.base.models import Status
 from gardeniq.base.utils import ViewSetTestMixin
+from gardeniq.base.views import StatusAPIModelView
 
 
 @pytest.mark.django_db
@@ -163,6 +164,8 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+        assert response.data["code"] == "method_not_allowed"
+        assert response.data["message"] == 'Method "PATCH" not allowed.'
 
     def test_partial_update_color(self, authenticated_client, obj):
         """Test partial update of status color is not allowed (PATCH method disabled)"""
@@ -208,7 +211,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "color" in response.data
+        assert "color" in response.data["errors"]
 
     def test_create_status_invalid_color_too_long(self, authenticated_client):
         """Test creating a status with a color that's too long"""
@@ -225,7 +228,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "color" in response.data
+        assert "color" in response.data["errors"]
 
     def test_create_status_invalid_color_missing_hash(self, authenticated_client):
         """Test creating a status with a color missing the # symbol"""
@@ -242,7 +245,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "color" in response.data
+        assert "color" in response.data["errors"]
 
     def test_create_status_short_color_format(self, authenticated_client):
         """Test creating a status with a valid short color format (#RGB)"""
@@ -275,7 +278,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "name" in response.data
+        assert "name" in response.data["errors"]
 
     def test_create_status_missing_tag(self, authenticated_client):
         """Test creating a status without a required tag field"""
@@ -291,7 +294,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "tag" in response.data
+        assert "tag" in response.data["errors"]
 
     def test_create_status_invalid_tag_format(self, authenticated_client):
         """Test creating a status with an invalid tag format (slug validation)"""
@@ -308,7 +311,7 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "tag" in response.data
+        assert "tag" in response.data["errors"]
 
     def test_retrieve_nonexistent_status(self, authenticated_client):
         """Test retrieving a status that doesn't exist"""
@@ -320,6 +323,12 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data == {
+            "status": 404,
+            "code": "not_found",
+            "message": "No Status matches the given query.",
+            "errors": {},
+        }
 
     def test_update_nonexistent_status(self, authenticated_client):
         """Test updating a status that doesn't exist"""
@@ -347,3 +356,46 @@ class TestStatusAPIModelView(StatusViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_unexpected_error_returns_generic_json_500(self, authenticated_client, mocker):
+        """An unexpected error in a view returns a JSON 500 without its details"""
+        # GIVEN
+        mocker.patch.object(StatusAPIModelView, "get_queryset", side_effect=ValueError("secret detail"))
+
+        # WHEN
+        response = authenticated_client.get(self.get_url_list())
+
+        # THEN
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.data["code"] == "server_error"
+        assert "secret detail" not in str(response.data)
+
+    def test_unexpected_error_is_raised_in_debug(self, authenticated_client, mocker, settings):
+        """With DEBUG, an unexpected error in a view is raised again, for Django's debug page and traceback"""
+        # GIVEN
+        settings.DEBUG = True
+        mocker.patch.object(StatusAPIModelView, "get_queryset", side_effect=ValueError("secret detail"))
+
+        # WHEN / THEN
+        with pytest.raises(ValueError, match="secret detail"):
+            authenticated_client.get(self.get_url_list())
+
+
+@pytest.mark.django_db
+class TestStatusAPIModelViewFilters(StatusViewSetTestConf):
+
+    def test_list_filters_by_tag(self, authenticated_client, obj):
+        """
+        GIVEN: two Statuses with different tags
+        WHEN: listing with ?tag=<tag of the default Status>
+        THEN: only the default Status is returned
+        """
+        # GIVEN
+        Status.objects.create(name="Other", tag="other-tag")
+
+        # WHEN
+        response = authenticated_client.get(self.get_url_list(), {"tag": obj.tag})
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+        assert [item["id"] for item in response.data["results"]] == [obj.pk]

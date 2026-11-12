@@ -6,9 +6,12 @@ from gardeniq.base.models import Status
 from gardeniq.base.utils.tests import ViewSetTestMixin
 from gardeniq.hardware.models import Channel
 from gardeniq.hardware.models import Device
+from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
 from gardeniq.hardware.models import Sensor
 from gardeniq.hardware.models import SensorCategory
+
+VALID_PIN_INIT_CFG = {"c": "Pin", "a": {"id": "@pin"}}
 
 # ─── SensorCategory View Tests ────────────────────────────────────────────────
 
@@ -17,11 +20,11 @@ from gardeniq.hardware.models import SensorCategory
 class SensorCategoryViewSetTestConf(ViewSetTestMixin):
     BASE_PATTERN = "sensor-categories"
     MODEL = SensorCategory
-    DATA_TO_DEFAULT_OBJ = {"name": "Default Category", "unity_value": "", "pin_init_cfg": {}}
+    DATA_TO_DEFAULT_OBJ = {"name": "Default Category", "unity_value": "", "pin_init_cfg": VALID_PIN_INIT_CFG}
 
     def generate_default_obj(self):
-        cat1 = SensorCategory.objects.create(name="Temperature", unity_value="°C", pin_init_cfg={})
-        cat2 = SensorCategory.objects.create(name="Humidity", unity_value="%", pin_init_cfg={})
+        cat1 = SensorCategory.objects.create(name="Temperature", unity_value="°C", pin_init_cfg=VALID_PIN_INIT_CFG)
+        cat2 = SensorCategory.objects.create(name="Humidity", unity_value="%", pin_init_cfg=VALID_PIN_INIT_CFG)
         return cat1, cat2
 
 
@@ -51,7 +54,8 @@ class TestSensorCategoryAPIModelView(SensorCategoryViewSetTestConf):
         assert "id" in first
         assert "name" in first
         assert "unity_value" in first
-        assert "pin_init_cfg" in first
+        assert "pin_init_cfg" not in first
+        assert first["is_ready"] is True
 
     def test_retrieve(self, authenticated_client, obj):
         """
@@ -72,6 +76,7 @@ class TestSensorCategoryAPIModelView(SensorCategoryViewSetTestConf):
         assert response.data["name"] == cat1.name
         assert response.data["unity_value"] == cat1.unity_value
         assert response.data["pin_init_cfg"] == cat1.pin_init_cfg
+        assert response.data["is_ready"] is True
 
     def test_create(self, authenticated_client):
         """
@@ -80,7 +85,7 @@ class TestSensorCategoryAPIModelView(SensorCategoryViewSetTestConf):
         THEN: the SensorCategory is created and the response contains the correct data
         """
         # GIVEN
-        payload = {"name": "Light", "unity_value": "lux", "pin_init_cfg": {"mode": "input"}}
+        payload = {"name": "Light", "unity_value": "lux", "pin_init_cfg": VALID_PIN_INIT_CFG}
         url = self.get_url_create()
 
         # WHEN
@@ -102,7 +107,7 @@ class TestSensorCategoryAPIModelView(SensorCategoryViewSetTestConf):
         # GIVEN
         cat1, _ = obj
         url = self.get_url_detail(cat1)
-        update_data = {"name": "Updated Temperature", "unity_value": "°F", "pin_init_cfg": {"mode": "input"}}
+        update_data = {"name": "Updated Temperature", "unity_value": "°F", "pin_init_cfg": VALID_PIN_INIT_CFG}
 
         # WHEN
         response = authenticated_client.put(url, update_data, format="json")
@@ -116,6 +121,37 @@ class TestSensorCategoryAPIModelView(SensorCategoryViewSetTestConf):
         assert cat1.name == update_data["name"]
         assert cat1.unity_value == update_data["unity_value"]
         assert cat1.pin_init_cfg == update_data["pin_init_cfg"]
+
+    def test_create_with_invalid_pin_init_cfg(self, authenticated_client):
+        """Test that creating a sensor category with an invalid pin_init_cfg returns 400."""
+        # GIVEN
+        payload = {"name": "Light", "unity_value": "lux", "pin_init_cfg": {"c": "Pin", "a": {"id": 4}}}
+        url = self.get_url_create()
+
+        # WHEN
+        response = authenticated_client.post(url, payload, format="json")
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+        assert "pin_init_cfg" in response.data["errors"]
+        assert response.data["errors"]["pin_init_cfg"][0].startswith("Failed validation JSON schema")
+        assert not SensorCategory.objects.filter(name=payload["name"]).exists()
+
+    def test_update_with_invalid_pin_init_cfg(self, authenticated_client, obj):
+        """Test that updating a sensor category with an invalid pin_init_cfg returns 400 and keeps the old value."""
+        # GIVEN
+        cat1, _ = obj
+        url = self.get_url_detail(cat1)
+        update_data = {"name": "Light", "unity_value": "lux", "pin_init_cfg": {"c": "UART", "a": {"id": "@pin"}}}
+
+        # WHEN
+        response = authenticated_client.put(url, update_data, format="json")
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+        assert "pin_init_cfg" in response.data["errors"]
+        cat1.refresh_from_db()
+        assert cat1.pin_init_cfg == VALID_PIN_INIT_CFG
 
     def test_delete(self, authenticated_client, obj):
         """
@@ -167,12 +203,20 @@ class SensorViewSetTestConf(ViewSetTestMixin):
         return Status.objects.create(name="Generic", tag="device-generic", color="#123456")
 
     @pytest.fixture
-    def device(self, device_status):
+    def device_category(self):
+        return DeviceCategory.objects.create(
+            name="Test Category",
+            pins_configuration={"available_channels": [], "digits": [], "pwms": [], "analogs": []},
+        )
+
+    @pytest.fixture
+    def device(self, device_status, device_category):
         return Device.objects.create(
             name="Test Device",
             uid="AABBCCDDEEFF0011",
             path="/dev/ttyUSB0",
             status=device_status,
+            category=device_category,
         )
 
     @pytest.fixture
@@ -187,7 +231,7 @@ class SensorViewSetTestConf(ViewSetTestMixin):
 
     @pytest.fixture
     def category(self, db):
-        return SensorCategory.objects.create(name="Temperature", unity_value="°C", pin_init_cfg={})
+        return SensorCategory.objects.create(name="Temperature", unity_value="°C", pin_init_cfg=VALID_PIN_INIT_CFG)
 
     @pytest.fixture
     def obj(self, category, device, pin, channel):
@@ -196,13 +240,11 @@ class SensorViewSetTestConf(ViewSetTestMixin):
         sensor1 = Sensor.objects.create(
             name="Sensor 1",
             category=category,
-            device=device,
             pin=pin,
         )
         sensor2 = Sensor.objects.create(
             name="Sensor 2",
             category=category,
-            device=device,
             pin=pin2,
         )
         return sensor1, sensor2
@@ -287,7 +329,6 @@ class TestSensorAPIModelView(SensorViewSetTestConf):
         payload = {
             "name": "New Sensor",
             "category": category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
         url = self.get_url_create()
@@ -299,7 +340,6 @@ class TestSensorAPIModelView(SensorViewSetTestConf):
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["name"] == payload["name"]
         assert response.data["category"] == category.pk
-        assert response.data["device"] == device.pk
         assert response.data["pin"] == pin.pk
         assert Sensor.objects.filter(name=payload["name"]).exists()
 
@@ -311,12 +351,11 @@ class TestSensorAPIModelView(SensorViewSetTestConf):
         """
         # GIVEN
         sensor1, _ = obj
-        new_category = SensorCategory.objects.create(name="Humidity", unity_value="%", pin_init_cfg={})
+        new_category = SensorCategory.objects.create(name="Humidity", unity_value="%", pin_init_cfg=VALID_PIN_INIT_CFG)
         url = self.get_url_detail(sensor1)
         update_data = {
             "name": "Updated Sensor",
             "category": new_category.pk,
-            "device": device.pk,
             "pin": pin.pk,
         }
 
@@ -365,3 +404,67 @@ class TestSensorAPIModelView(SensorViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+
+@pytest.mark.django_db
+class TestSensorAPIModelViewPin(SensorViewSetTestConf):
+
+    def test_create_with_used_pin_returns_400(self, authenticated_client, obj, category):
+        """
+        GIVEN: a Pin already used by a Sensor
+        WHEN: sending a POST request with the same Pin
+        THEN: the response is 400 with an error on pin
+        """
+        # GIVEN
+        first, _ = obj
+        payload = {"name": "Duplicate", "category": category.pk, "pin": first.pin.pk}
+
+        # WHEN
+        response = authenticated_client.post(self.get_url_create(), payload, format="json")
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+        assert list(response.data["errors"]) == ["pin"]
+
+    def test_list_filters_by_device(self, authenticated_client, obj, category, device_status, device_category, channel):
+        """
+        GIVEN: two Sensors on a device and one on another device
+        WHEN: listing with ?device=<other device>
+        THEN: only the Sensor of the other device is returned
+        """
+        # GIVEN
+        other_device = Device.objects.create(
+            name="Other Device",
+            uid="1122334455667788",
+            path="/dev/ttyUSB1",
+            status=device_status,
+            category=device_category,
+        )
+        other_pin = Pin.objects.create(device=other_device, channel_choiced=channel, pin_number=1)
+        other = Sensor.objects.create(name="Other", category=category, pin=other_pin)
+
+        # WHEN
+        response = authenticated_client.get(self.get_url_list(), {"device": other_device.pk})
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+        assert [item["id"] for item in response.data["results"]] == [other.pk]
+
+    def test_list_filters_by_category(self, authenticated_client, obj, category):
+        """
+        GIVEN: two Sensors, one moved to a new category
+        WHEN: listing with ?category=<new category>
+        THEN: only that Sensor is returned
+        """
+        # GIVEN
+        first, _ = obj
+        new_category = SensorCategory.objects.create(name="New", pin_init_cfg=VALID_PIN_INIT_CFG)
+        first.category = new_category
+        first.save()
+
+        # WHEN
+        response = authenticated_client.get(self.get_url_list(), {"category": new_category.pk})
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+        assert [item["id"] for item in response.data["results"]] == [first.pk]

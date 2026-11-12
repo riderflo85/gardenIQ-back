@@ -1,17 +1,19 @@
 from django.db import models
 
 from gardeniq.base.models import NameMixinModel
+from gardeniq.base.models import SeederMixinModel
 
-from .device import Device
 from .mixins import PinInitConfigMixin
-from .pin import Pin
+from .mixins import PinOwnerMixin
 
 
-class SensorCategory(PinInitConfigMixin, NameMixinModel):
+class SensorCategory(PinInitConfigMixin, NameMixinModel, SeederMixinModel):
     """
     Inherited fields:
       - `name`
       - `pin_init_cfg`
+      - `seed_id`
+      - `is_ready`
     """
 
     unity_value = models.CharField(
@@ -26,9 +28,10 @@ class SensorCategory(PinInitConfigMixin, NameMixinModel):
         verbose_name_plural = "sensor categories"
 
 
-class Sensor(NameMixinModel):
+class Sensor(PinOwnerMixin, NameMixinModel):
     """
     Inherited fields:
+      - `pin`
       - `name`
     """
 
@@ -37,18 +40,6 @@ class Sensor(NameMixinModel):
         on_delete=models.PROTECT,
         related_name="sensors",
         verbose_name="sensor category",
-    )
-    device = models.ForeignKey(
-        Device,
-        on_delete=models.PROTECT,
-        related_name="sensors",
-        verbose_name="device",
-    )
-    pin = models.ForeignKey(
-        Pin,
-        on_delete=models.PROTECT,
-        related_name="sensors",
-        verbose_name="pin",
     )
 
     class Meta:

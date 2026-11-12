@@ -1,4 +1,5 @@
 from django.db import IntegrityError
+from django.db import transaction
 from django.db.models import ProtectedError
 
 import pytest
@@ -6,6 +7,7 @@ import pytest
 from gardeniq.base.models import Status
 from gardeniq.hardware.models import Channel
 from gardeniq.hardware.models import Device
+from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -17,12 +19,21 @@ def device_status(db):
 
 
 @pytest.fixture
-def device(device_status):
+def device_category(db):
+    return DeviceCategory.objects.create(
+        name="Test Category",
+        pins_configuration={"available_channels": [], "digits": [], "pwms": [], "analogs": []},
+    )
+
+
+@pytest.fixture
+def device(device_status, device_category):
     return Device.objects.create(
         name="Test Device",
         uid="AABBCCDDEEFF0011",
         path="/dev/ttyUSB0",
         status=device_status,
+        category=device_category,
     )
 
 
@@ -75,6 +86,19 @@ class TestChannelCreation:
         # THEN
         assert channel.pk is not None
         assert channel.description == "Pulse-width modulation channel"
+
+    def test_name_is_unique(self):
+        """
+        GIVEN: a Channel with a given name
+        WHEN: creating another Channel with the same name
+        THEN: the database refuses it
+        """
+        # GIVEN
+        Channel.objects.create(name="Digital")
+
+        # WHEN / THEN
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Channel.objects.create(name="Digital")
 
     def test_create_multiple_channels(self):
         """
@@ -142,6 +166,37 @@ class TestChannelDescription:
         # THEN
         refreshed = Channel.objects.get(pk=channel.pk)
         assert refreshed.name == new_name
+
+
+@pytest.mark.django_db
+class TestChannelSeederFields:
+    """Tests for the seeder fields of Channel."""
+
+    def test_seeder_fields_defaults(self):
+        """
+        GIVEN: a name for a Channel
+        WHEN: creating it without seeder fields
+        THEN: is_ready defaults to True and seed_id to None
+        """
+        # GIVEN / WHEN
+        channel = Channel.objects.create(name="Digital")
+
+        # THEN
+        assert channel.is_ready is True
+        assert channel.seed_id is None
+
+    def test_seed_id_is_unique(self):
+        """
+        GIVEN: a Channel with a seed_id
+        WHEN: creating another Channel with the same seed_id
+        THEN: the database refuses it
+        """
+        # GIVEN
+        Channel.objects.create(name="digit", seed_id=1)
+
+        # WHEN / THEN
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Channel.objects.create(name="analog", seed_id=1)
 
 
 @pytest.mark.django_db
@@ -268,6 +323,19 @@ class TestPinCreation:
         assert p.channel_choiced == channel
         assert p.pin_number == 1
 
+    def test_create_pin_without_channel_choiced(self, device):
+        """
+        GIVEN: a Device and a pin_number
+        WHEN: creating a Pin without channel_choiced
+        THEN: the Pin is created and channel_choiced is empty
+        """
+        # GIVEN / WHEN
+        p = Pin.objects.create(device=device, pin_number=1)
+
+        # THEN
+        p.refresh_from_db()
+        assert p.channel_choiced is None
+
     def test_create_pin_with_channels_available(self, device, channel):
         """
         GIVEN: a Device, a Channel and a list of available channels
@@ -317,7 +385,7 @@ class TestPinConstraints:
         with pytest.raises(IntegrityError):
             Pin.objects.create(device=device, channel_choiced=channel, pin_number=1)
 
-    def test_same_pin_number_on_different_devices_is_allowed(self, device, channel, device_status):
+    def test_same_pin_number_on_different_devices_is_allowed(self, device, channel, device_status, device_category):
         """
         GIVEN: two distinct Devices
         WHEN: creating a Pin with the same pin_number on each Device
@@ -329,6 +397,7 @@ class TestPinConstraints:
             uid="1122334455667788",
             path="/dev/ttyUSB1",
             status=device_status,
+            category=device_category,
         )
 
         # WHEN

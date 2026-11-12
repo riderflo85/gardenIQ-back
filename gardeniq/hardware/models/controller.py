@@ -1,17 +1,19 @@
 from django.db import models
 
 from gardeniq.base.models import NameMixinModel
+from gardeniq.base.models import SeederMixinModel
 
-from .device import Device
 from .mixins import PinInitConfigMixin
-from .pin import Pin
+from .mixins import PinOwnerMixin
 
 
-class ControllerCategory(PinInitConfigMixin, NameMixinModel):
+class ControllerCategory(PinInitConfigMixin, NameMixinModel, SeederMixinModel):
     """
     Inherited fields:
       - `name`
       - `pin_init_cfg`
+      - `seed_id`
+      - `is_ready`
     """
 
     class Meta:
@@ -19,9 +21,10 @@ class ControllerCategory(PinInitConfigMixin, NameMixinModel):
         verbose_name_plural = "controller categories"
 
 
-class Controller(NameMixinModel):
+class Controller(PinOwnerMixin, NameMixinModel):
     """
     Inherited fields:
+      - `pin`
       - `name`
     """
 
@@ -30,18 +33,6 @@ class Controller(NameMixinModel):
         on_delete=models.PROTECT,
         related_name="controllers",
         verbose_name="controller category",
-    )
-    device = models.ForeignKey(
-        Device,
-        on_delete=models.PROTECT,
-        related_name="controllers",
-        verbose_name="device",
-    )
-    pin = models.ForeignKey(
-        Pin,
-        on_delete=models.PROTECT,
-        related_name="controllers",
-        verbose_name="pin",
     )
 
     class Meta:

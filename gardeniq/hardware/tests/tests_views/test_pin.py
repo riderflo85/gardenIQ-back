@@ -5,8 +5,13 @@ import pytest
 from gardeniq.base.models import Status
 from gardeniq.base.utils.tests import ViewSetTestMixin
 from gardeniq.hardware.models import Channel
+from gardeniq.hardware.models import Controller
+from gardeniq.hardware.models import ControllerCategory
 from gardeniq.hardware.models import Device
+from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
+from gardeniq.hardware.models import Sensor
+from gardeniq.hardware.models import SensorCategory
 
 # ─── Channel View Tests ────────────────────────────────────────────────────────
 
@@ -49,6 +54,7 @@ class TestChannelAPIModelView(ChannelViewSetTestConf):
         assert "id" in first
         assert "name" in first
         assert "description" in first
+        assert first["is_ready"] is True
 
     def test_retrieve(self, authenticated_client, obj):
         """
@@ -147,12 +153,20 @@ class PinViewSetTestConf(ViewSetTestMixin):
         return Status.objects.create(name="Generic", tag="device-generic", color="#123456")
 
     @pytest.fixture
-    def device(self, device_status):
+    def device_category(self):
+        return DeviceCategory.objects.create(
+            name="Test Category",
+            pins_configuration={"available_channels": [], "digits": [], "pwms": [], "analogs": []},
+        )
+
+    @pytest.fixture
+    def device(self, device_status, device_category):
         return Device.objects.create(
             name="Test Device",
             uid="AABBCCDDEEFF0011",
             path="/dev/ttyUSB0",
             status=device_status,
+            category=device_category,
         )
 
     @pytest.fixture
@@ -338,3 +352,61 @@ class TestPinAPIModelView(PinViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+
+@pytest.mark.django_db
+class TestPinAPIModelViewFilters(PinViewSetTestConf):
+
+    @pytest.fixture
+    def other_device(self, device_status, device_category):
+        return Device.objects.create(
+            name="Other Device",
+            uid="1122334455667788",
+            path="/dev/ttyUSB1",
+            status=device_status,
+            category=device_category,
+        )
+
+    def test_list_filters_by_device(self, authenticated_client, obj, other_device, channel):
+        """
+        GIVEN: two Pins on a device and one on another device
+        WHEN: listing with ?device=<other device>
+        THEN: only the Pin of the other device is returned
+        """
+        # GIVEN
+        other_pin = Pin.objects.create(device=other_device, channel_choiced=channel, pin_number=1)
+
+        # WHEN
+        response = authenticated_client.get(self.get_url_list(), {"device": other_device.pk})
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+        assert [item["id"] for item in response.data["results"]] == [other_pin.pk]
+
+    def test_list_available_pins_of_a_device(self, authenticated_client, device, other_device, channel):
+        """
+        GIVEN: a device with a free Pin, a Pin used by a Sensor and a Pin used by a Controller
+        WHEN: listing with ?device=<device>&available=true
+        THEN: only the free Pin of this device is returned
+        """
+        # GIVEN
+        free_pin, sensor_pin, controller_pin = (
+            Pin.objects.create(device=device, channel_choiced=channel, pin_number=n) for n in (1, 2, 3)
+        )
+        Pin.objects.create(device=other_device, channel_choiced=channel, pin_number=1)
+        cfg = {"c": "Pin", "a": {"id": "@pin"}}
+        Sensor.objects.create(
+            name="Sensor", category=SensorCategory.objects.create(name="S", pin_init_cfg=cfg), pin=sensor_pin
+        )
+        Controller.objects.create(
+            name="Relay", category=ControllerCategory.objects.create(name="C", pin_init_cfg=cfg), pin=controller_pin
+        )
+
+        # WHEN
+        response = authenticated_client.get(self.get_url_list(), {"device": device.pk, "available": "true"})
+        used = authenticated_client.get(self.get_url_list(), {"device": device.pk, "available": "false"})
+
+        # THEN
+        assert response.status_code == status.HTTP_200_OK
+        assert [item["id"] for item in response.data["results"]] == [free_pin.pk]
+        assert sorted(item["id"] for item in used.data["results"]) == sorted([sensor_pin.pk, controller_pin.pk])

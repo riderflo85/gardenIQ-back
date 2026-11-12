@@ -1,3 +1,6 @@
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
+from django.db import transaction
 from django.db.models import ProtectedError
 
 import pytest
@@ -7,7 +10,12 @@ from gardeniq.hardware.models import Channel
 from gardeniq.hardware.models import Controller
 from gardeniq.hardware.models import ControllerCategory
 from gardeniq.hardware.models import Device
+from gardeniq.hardware.models import DeviceCategory
 from gardeniq.hardware.models import Pin
+from gardeniq.hardware.models import Sensor
+from gardeniq.hardware.models import SensorCategory
+
+VALID_PIN_INIT_CFG = {"c": "Pin", "a": {"id": "@pin"}}
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -18,12 +26,21 @@ def device_status(db):
 
 
 @pytest.fixture
-def device(device_status):
+def device_category(db):
+    return DeviceCategory.objects.create(
+        name="Test Category",
+        pins_configuration={"available_channels": [], "digits": [], "pwms": [], "analogs": []},
+    )
+
+
+@pytest.fixture
+def device(device_status, device_category):
     return Device.objects.create(
         name="Test Device",
         uid="AABBCCDDEEFF0011",
         path="/dev/ttyUSB0",
         status=device_status,
+        category=device_category,
     )
 
 
@@ -45,7 +62,7 @@ def pin(device, channel):
 
 @pytest.fixture
 def controller_category(db):
-    return ControllerCategory.objects.create(name="Relay")
+    return ControllerCategory.objects.create(name="Relay", pin_init_cfg=VALID_PIN_INIT_CFG)
 
 
 @pytest.fixture
@@ -53,7 +70,6 @@ def controller(controller_category, device, pin):
     return Controller.objects.create(
         name="Main Relay",
         category=controller_category,
-        device=device,
         pin=pin,
     )
 
@@ -65,19 +81,20 @@ def controller(controller_category, device, pin):
 class TestControllerCategoryCreation:
     """Tests for ControllerCategory model creation."""
 
-    def test_create_with_name_only(self):
+    def test_create_with_default_seeder_fields(self):
         """
-        GIVEN: a name for a ControllerCategory
-        WHEN: creating a ControllerCategory without specifying pin_init_cfg
-        THEN: the ControllerCategory is created with an empty dict as default pin_init_cfg
+        GIVEN: a name and a valid pin_init_cfg
+        WHEN: creating a ControllerCategory without seeder fields
+        THEN: is_ready defaults to True and seed_id to None
         """
         # GIVEN / WHEN
-        category = ControllerCategory.objects.create(name="Relay")
+        category = ControllerCategory.objects.create(name="Relay", pin_init_cfg=VALID_PIN_INIT_CFG)
 
         # THEN
         assert category.pk is not None
         assert category.name == "Relay"
-        assert category.pin_init_cfg == {}
+        assert category.is_ready is True
+        assert category.seed_id is None
 
     def test_create_with_custom_pin_init_cfg(self):
         """
@@ -86,7 +103,7 @@ class TestControllerCategoryCreation:
         THEN: the ControllerCategory is created with the provided configuration
         """
         # GIVEN
-        cfg = {"mode": "output", "pull": "none"}
+        cfg = {"c": "PWM", "a": {"dest": "@pin", "freq": 1000}}
 
         # WHEN
         category = ControllerCategory.objects.create(name="LED Driver", pin_init_cfg=cfg)
@@ -106,7 +123,7 @@ class TestControllerCategoryCreation:
 
         # WHEN
         for name in names:
-            ControllerCategory.objects.create(name=name)
+            ControllerCategory.objects.create(name=name, pin_init_cfg=VALID_PIN_INIT_CFG)
 
         # THEN
         assert ControllerCategory.objects.count() == len(names)
@@ -116,26 +133,25 @@ class TestControllerCategoryCreation:
 class TestControllerCategoryPinInitCfg:
     """Tests for ControllerCategory pin_init_cfg field."""
 
-    def test_pin_init_cfg_defaults_to_empty_dict(self):
+    def test_save_rejects_missing_pin_init_cfg(self):
         """
         GIVEN: no pin_init_cfg value
-        WHEN: creating a ControllerCategory without specifying pin_init_cfg
-        THEN: the field defaults to an empty dict
+        WHEN: creating a ControllerCategory
+        THEN: a ValidationError is raised on pin_init_cfg (the field has no default)
         """
-        # GIVEN / WHEN
-        category = ControllerCategory.objects.create(name="Relay")
-
-        # THEN
-        assert category.pin_init_cfg == {}
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc_info:
+            ControllerCategory.objects.create(name="Relay")
+        assert "pin_init_cfg" in exc_info.value.message_dict
 
     def test_pin_init_cfg_can_be_updated(self, controller_category):
         """
-        GIVEN: an existing ControllerCategory with an empty pin_init_cfg
+        GIVEN: an existing ControllerCategory
         WHEN: updating the pin_init_cfg with new values
         THEN: the new configuration is persisted correctly
         """
         # GIVEN
-        new_cfg = {"frequency": 1000, "duty_cycle": 50}
+        new_cfg = {"c": "PWM", "a": {"dest": "@pin", "freq": 1000, "duty_u16": 512}}
 
         # WHEN
         controller_category.pin_init_cfg = new_cfg
@@ -152,7 +168,7 @@ class TestControllerCategoryPinInitCfg:
         THEN: the nested structure is stored and retrieved correctly
         """
         # GIVEN
-        nested_cfg = {"settings": {"mode": "output", "options": {"pull": "none", "value": 0}}}
+        nested_cfg = {"c": "Pin", "a": {"id": "@pin", "mode": "@:OUT", "opts": {"pull": [1, 2], "value": None}}}
 
         # WHEN
         category = ControllerCategory.objects.create(
@@ -163,6 +179,63 @@ class TestControllerCategoryPinInitCfg:
         # THEN
         refreshed = ControllerCategory.objects.get(pk=category.pk)
         assert refreshed.pin_init_cfg == nested_cfg
+
+    @pytest.mark.parametrize(
+        "cfg",
+        [
+            pytest.param({}, id="empty"),
+            pytest.param({"c": "Pin"}, id="missing-a"),
+            pytest.param({"a": {"id": "@pin"}}, id="missing-c"),
+            pytest.param({"c": "I2C", "a": {"id": "@pin"}}, id="class-not-whitelisted"),
+            pytest.param({"c": "Pin", "a": {"id": "@pin"}, "x": 1}, id="extra-key"),
+            pytest.param({"c": "Pin", "a": {"id": 4}}, id="no-pin-reference"),
+            pytest.param({"c": "Pin", "a": {"id": "@pin", "mode": "@foo"}}, id="unknown-reference"),
+            pytest.param({"c": "Pin", "a": {"id": "@pin", "mode": "@:in"}}, id="lowercase-constant"),
+            pytest.param({"c": "Pin", "a": {"id": "@pin", "name": "a b"}}, id="space-in-value"),
+            pytest.param({"c": "Pin", "a": {"id": "@pin", "my arg": 1}}, id="space-in-arg-name"),
+            pytest.param({"c": "Pin", "a": {"id": "@pin", "opts": {"k": ["a;b"]}}}, id="semicolon-nested"),
+            pytest.param({"c": "Pin", "a": {"id": "@pin", "opts": {"a\nb": 1}}}, id="newline-nested-key"),
+        ],
+    )
+    def test_save_rejects_invalid_pin_init_cfg(self, cfg):
+        """
+        GIVEN: a pin_init_cfg that does not match PIN_INIT_CONFIG_JSON_SCHEMA
+        WHEN: creating a ControllerCategory
+        THEN: a ValidationError is raised on pin_init_cfg and nothing is saved
+        """
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc_info:
+            ControllerCategory.objects.create(name="Relay", pin_init_cfg=cfg)
+        assert "pin_init_cfg" in exc_info.value.message_dict
+        assert ControllerCategory.objects.count() == 0
+
+    def test_full_clean_rejects_invalid_pin_init_cfg(self):
+        """
+        GIVEN: an unsaved ControllerCategory with an invalid pin_init_cfg
+        WHEN: calling full_clean(), as model forms (Django admin) do
+        THEN: a ValidationError is raised on the pin_init_cfg field only
+        """
+        # GIVEN
+        category = ControllerCategory(name="Relay", pin_init_cfg={"c": "Pin", "a": {"id": 4}})
+
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc_info:
+            category.full_clean()
+        assert list(exc_info.value.message_dict) == ["pin_init_cfg"]
+
+    def test_save_rejects_invalid_pin_init_cfg_on_update(self, controller_category):
+        """
+        GIVEN: an existing ControllerCategory
+        WHEN: saving it with an invalid pin_init_cfg
+        THEN: a ValidationError is raised and the stored value is unchanged
+        """
+        # GIVEN
+        controller_category.pin_init_cfg = {"c": "Pin", "a": {}}
+
+        # WHEN / THEN
+        with pytest.raises(ValidationError):
+            controller_category.save()
+        assert ControllerCategory.objects.get(pk=controller_category.pk).pin_init_cfg == VALID_PIN_INIT_CFG
 
 
 @pytest.mark.django_db
@@ -250,7 +323,6 @@ class TestControllerCreation:
         ctrl = Controller.objects.create(
             name="Main Relay",
             category=controller_category,
-            device=device,
             pin=pin,
         )
 
@@ -258,7 +330,7 @@ class TestControllerCreation:
         assert ctrl.pk is not None
         assert ctrl.name == "Main Relay"
         assert ctrl.category == controller_category
-        assert ctrl.device == device
+        assert ctrl.pin.device == device
         assert ctrl.pin == pin
 
     def test_create_multiple_controllers_for_same_device(self, controller_category, device, channel):
@@ -272,8 +344,8 @@ class TestControllerCreation:
         pin2 = Pin.objects.create(device=device, channel_choiced=channel, pin_number=3)
 
         # WHEN
-        Controller.objects.create(name="Relay 1", category=controller_category, device=device, pin=pin1)
-        Controller.objects.create(name="Relay 2", category=controller_category, device=device, pin=pin2)
+        Controller.objects.create(name="Relay 1", category=controller_category, pin=pin1)
+        Controller.objects.create(name="Relay 2", category=controller_category, pin=pin2)
 
         # THEN
         assert Controller.objects.count() == 2
@@ -299,14 +371,14 @@ class TestControllerRelations:
 
     def test_device_relation_returns_correct_device(self, controller, device):
         """
-        GIVEN: a Controller linked to a Device
-        WHEN: accessing the device attribute
+        GIVEN: a Controller linked to a Pin of a Device
+        WHEN: accessing the device of its pin
         THEN: the correct Device is returned
         """
-        # GIVEN - fixture creates the Controller with the device
+        # GIVEN - fixture creates the Controller with a pin of the device
 
         # WHEN
-        result = controller.device
+        result = controller.pin.device
 
         # THEN
         assert result == device
@@ -328,13 +400,13 @@ class TestControllerRelations:
     def test_device_reverse_relation_includes_controller(self, controller, device):
         """
         GIVEN: a Controller linked to a Device
-        WHEN: accessing the controllers reverse relation on the Device
+        WHEN: filtering the Controllers by the device of their pin
         THEN: the related Controller is returned
         """
-        # GIVEN - fixture creates the Controller linked to the device
+        # GIVEN - fixture creates the Controller linked to a pin of the device
 
         # WHEN
-        related = device.controllers.all()
+        related = Controller.objects.filter(pin__device=device)
 
         # THEN
         assert related.count() == 1
@@ -343,17 +415,16 @@ class TestControllerRelations:
     def test_pin_reverse_relation_includes_controller(self, controller, pin):
         """
         GIVEN: a Controller linked to a Pin
-        WHEN: accessing the controllers reverse relation on the Pin
+        WHEN: accessing the controller reverse one-to-one relation on the Pin
         THEN: the related Controller is returned
         """
         # GIVEN - fixture creates the Controller linked to the pin
 
         # WHEN
-        related = pin.controllers.all()
+        related = pin.controller
 
         # THEN
-        assert related.count() == 1
-        assert controller in related
+        assert related == controller
 
 
 @pytest.mark.django_db
@@ -431,7 +502,7 @@ class TestControllerUpdate:
         THEN: the category FK is updated correctly in the database
         """
         # GIVEN
-        new_category = ControllerCategory.objects.create(name="Motor Controller")
+        new_category = ControllerCategory.objects.create(name="Motor Controller", pin_init_cfg=VALID_PIN_INIT_CFG)
 
         # WHEN
         controller.category = new_category
@@ -522,3 +593,88 @@ class TestControllerDeletion:
 
         # THEN
         assert Pin.objects.filter(pk=pin_id).exists()
+
+
+# ─── Pin owner ────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestControllerPinOwner:
+    """Tests for the rule: a Pin is used by one Sensor or Controller only."""
+
+    @pytest.fixture
+    def other_owner(self, pin):
+        category = SensorCategory.objects.create(name="Other", pin_init_cfg=VALID_PIN_INIT_CFG)
+        return Sensor.objects.create(name="Other owner", category=category, pin=pin)
+
+    def test_save_rejects_pin_used_by_another_controller(self, controller, controller_category, pin):
+        """
+        GIVEN: a Pin already used by a Controller
+        WHEN: creating a second Controller on the same Pin
+        THEN: the database refuses it
+        """
+        # GIVEN - fixture creates the Controller on the pin
+
+        # WHEN / THEN
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Controller.objects.create(name="Second", category=controller_category, pin=pin)
+
+    def test_full_clean_rejects_pin_used_by_another_controller(self, controller, controller_category, pin):
+        """
+        GIVEN: a Pin already used by a Controller
+        WHEN: validating a second Controller on the same Pin
+        THEN: a ValidationError is raised on the pin field
+        """
+        # GIVEN
+        second = Controller(name="Second", category=controller_category, pin=pin)
+
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc:
+            second.full_clean()
+        assert "pin" in exc.value.message_dict
+
+    def test_save_rejects_pin_used_by_a_sensor(self, other_owner, controller_category, pin):
+        """
+        GIVEN: a Pin already used by a Sensor
+        WHEN: creating a Controller on the same Pin
+        THEN: a ValidationError is raised on the pin field and nothing is saved
+        """
+        # GIVEN - fixture creates the Sensor on the pin
+
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc:
+            Controller.objects.create(name="Controller", category=controller_category, pin=pin)
+        assert "pin" in exc.value.message_dict
+        assert Controller.objects.count() == 0
+
+    def test_full_clean_rejects_pin_used_by_a_sensor(self, other_owner, controller_category, pin):
+        """
+        GIVEN: a Pin already used by a Sensor
+        WHEN: validating a Controller on the same Pin
+        THEN: a ValidationError is raised on the pin field
+        """
+        # GIVEN
+        obj = Controller(name="Controller", category=controller_category, pin=pin)
+
+        # WHEN / THEN
+        with pytest.raises(ValidationError) as exc:
+            obj.full_clean()
+        assert "pin" in exc.value.message_dict
+
+    def test_save_keeps_its_own_pin(self, controller, pin):
+        """
+        GIVEN: an existing Controller
+        WHEN: saving it again without changing its Pin
+        THEN: the save succeeds
+        """
+        # GIVEN
+        controller.name = "Renamed"
+
+        # WHEN
+        controller.full_clean()
+        controller.save()
+
+        # THEN
+        controller.refresh_from_db()
+        assert controller.name == "Renamed"
+        assert controller.pin == pin

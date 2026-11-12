@@ -4,8 +4,10 @@ import pytest
 
 from gardeniq.base.models import Status
 from gardeniq.base.utils import ViewSetTestMixin
+from gardeniq.hardware.models import Channel
 from gardeniq.hardware.models import Device
 from gardeniq.hardware.models import DeviceCategory
+from gardeniq.hardware.models import Pin
 
 
 @pytest.mark.django_db
@@ -36,6 +38,19 @@ class DeviceViewSetTestConf(ViewSetTestMixin):
         return DeviceCategory.objects.create(
             name="Device Category",
             pins_configuration={"available_channels": [], "digits": [], "pwms": [], "analogs": []},
+        )
+
+    @pytest.fixture
+    def datasheet_category_obj(self):
+        """Fixture to create a DeviceCategory whose datasheet lists the `digit` channel and two pins"""
+        return DeviceCategory.objects.create(
+            name="Datasheet Category",
+            pins_configuration={
+                "available_channels": ["digit"],
+                "digits": [{"name": "GP0", "pins": [0]}, {"name": "GP1", "pins": [1]}],
+                "pwms": [],
+                "analogs": [],
+            },
         )
 
     @pytest.fixture
@@ -138,6 +153,51 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
         assert device_obj.description == "A new device description"
         assert device_obj.status == status_obj
         assert device_obj.need_upgrade is False
+
+    def test_create_device_creates_the_pins_of_its_category(
+        self, mock_serial_ports, authenticated_client, status_obj, datasheet_category_obj
+    ):
+        """Creating a device through the API creates the pins listed in the datasheet of its category"""
+        # GIVEN
+        Channel.objects.create(name="digit")
+        device_data = {
+            "name": "New Device",
+            "path": "/dev/ttyUSB1",
+            "status": status_obj.id,
+            "category": datasheet_category_obj.id,
+            "communication_protocol": "USB",
+        }
+
+        # WHEN
+        response = authenticated_client.post(self.get_url_create(), data=device_data)
+
+        # THEN
+        assert response.status_code == status.HTTP_201_CREATED, response.content
+        pins = Pin.objects.filter(device__name="New Device")
+        assert sorted(pins.values_list("pin_number", flat=True)) == [0, 1]
+
+    def test_create_device_with_unknown_channel_returns_400(
+        self, mock_serial_ports, authenticated_client, status_obj, datasheet_category_obj
+    ):
+        """A category whose datasheet lists a channel missing from the database is refused with a 400"""
+        # GIVEN - no Channel in database
+        device_data = {
+            "name": "New Device",
+            "path": "/dev/ttyUSB1",
+            "status": status_obj.id,
+            "category": datasheet_category_obj.id,
+            "communication_protocol": "USB",
+        }
+
+        # WHEN
+        response = authenticated_client.post(self.get_url_create(), data=device_data)
+
+        # THEN
+        assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
+        assert response.data["code"] == "does_not_exist"
+        assert "digit" in response.data["message"]
+        assert not Device.objects.exists()
+        assert not Pin.objects.exists()
 
     def test_create_device_without_description(self, mock_serial_ports, authenticated_client, status_obj, category_obj):
         """Test creating a device without description (optional field)"""
@@ -252,7 +312,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "path" in response.data
+        assert "path" in response.data["errors"]
 
     def test_create_device_path_not_in_choices(self, mock_serial_ports, authenticated_client, status_obj, category_obj):
         """Test creating a device with a path not in available choices"""
@@ -271,7 +331,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "path" in response.data
+        assert "path" in response.data["errors"]
 
     def test_create_device_missing_name(self, mock_serial_ports, authenticated_client, status_obj, category_obj):
         """Test creating a device without a required name field"""
@@ -289,7 +349,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "name" in response.data
+        assert "name" in response.data["errors"]
 
     def test_create_device_without_path(self, mock_serial_ports, authenticated_client, status_obj, category_obj):
         """Test creating a device without path (optional field)"""
@@ -399,7 +459,7 @@ class TestDeviceAPIModelView(DeviceViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "name" in response.data
+        assert "name" in response.data["errors"]
 
     def test_create_device_with_com_port(self, mock_serial_ports, authenticated_client, status_obj, category_obj):
         """Test creating a device with a Windows COM port path"""
@@ -600,8 +660,8 @@ class TestDeviceCategoryAPIModelView(DeviceCategoryViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "pins_configuration" in response.data
-        assert response.data["pins_configuration"][0].startswith("Failed validation JSON schema")
+        assert "pins_configuration" in response.data["errors"]
+        assert response.data["errors"]["pins_configuration"][0].startswith("Failed validation JSON schema")
         assert DeviceCategory.objects.count() == 0
 
     def test_create_without_name(self, authenticated_client):
@@ -614,7 +674,7 @@ class TestDeviceCategoryAPIModelView(DeviceCategoryViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "name" in response.data
+        assert "name" in response.data["errors"]
 
     def test_update_device_category(self, authenticated_client, obj):
         """PUT updates the category."""
@@ -662,6 +722,22 @@ class TestDeviceCategoryAPIModelView(DeviceCategoryViewSetTestConf):
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not DeviceCategory.objects.filter(pk=obj.pk).exists()
 
+    def test_delete_device_category_used_by_a_device_returns_409(self, authenticated_client, obj):
+        """DELETE of a category used by a device is refused with a 409 that lists the device."""
+        # GIVEN
+        Channel.objects.create(name="digit")
+        device_status = Status.objects.create(name="Device Active", tag="device-active", color="#00FF00")
+        device = Device.objects.create(name="Card", category=obj, status=device_status)
+
+        # WHEN
+        response = authenticated_client.delete(self.get_url_detail(obj))
+
+        # THEN
+        assert response.status_code == status.HTTP_409_CONFLICT, response.content
+        assert response.data["code"] == "protected"
+        assert response.data["errors"] == {"devices": [str(device)]}
+        assert DeviceCategory.objects.filter(pk=obj.pk).exists()
+
     def test_retrieve_nonexistent(self, authenticated_client):
         """An unknown category returns 404."""
         # WHEN
@@ -677,6 +753,8 @@ class TestDeviceCategoryAPIModelView(DeviceCategoryViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.data["code"] == "not_authenticated"
+        assert response["WWW-Authenticate"] == "Token"
 
 
 @pytest.mark.django_db

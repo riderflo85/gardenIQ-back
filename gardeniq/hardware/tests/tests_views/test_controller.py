@@ -112,8 +112,8 @@ class TestControllerCategoryAPIModelView(ControllerCategoryViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
-        assert "pin_init_cfg" in response.data
-        assert response.data["pin_init_cfg"][0].startswith("Failed validation JSON schema")
+        assert "pin_init_cfg" in response.data["errors"]
+        assert response.data["errors"]["pin_init_cfg"][0].startswith("Failed validation JSON schema")
         assert not ControllerCategory.objects.filter(name=payload["name"]).exists()
 
     def test_update_with_invalid_pin_init_cfg(self, authenticated_client, obj):
@@ -128,7 +128,7 @@ class TestControllerCategoryAPIModelView(ControllerCategoryViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
-        assert "pin_init_cfg" in response.data
+        assert "pin_init_cfg" in response.data["errors"]
         cat1.refresh_from_db()
         assert cat1.pin_init_cfg == VALID_PIN_INIT_CFG
 
@@ -371,7 +371,7 @@ class TestControllerAPIModelViewPin(ControllerViewSetTestConf):
 
         # THEN
         assert response.status_code == status.HTTP_400_BAD_REQUEST, response.content
-        assert list(response.data) == ["pin"]
+        assert list(response.data["errors"]) == ["pin"]
 
     def test_list_filters_by_device(self, authenticated_client, obj, category, device_status, device_category, channel):
         """

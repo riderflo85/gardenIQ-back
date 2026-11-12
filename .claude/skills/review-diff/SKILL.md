@@ -61,7 +61,7 @@ Si la branche ou la PR porte un ticket `TK-<id>` et que le MCP Notion est connec
   - les routes d'une app sont dans son `api_urls.py`, inclus dans `gardeniq/urls.py` ;
   - les vues héritent de `BaseAPIModelViewSet` (`serializer_class`, `detail_serializer_class`, `list_serializer_class`), les serializers de `BaseSerializer` (pas de `ModelSerializer`), ceux de lecture de `ReadOnlySerializer` ;
   - les modèles réutilisent les mixins de `base/models/mixins.py` ;
-  - les erreurs attendues sont gérées explicitement dans la vue, `APIException` en dernier recours ;
+  - les erreurs de l'API sont levées et traduites par le gestionnaire global (`base/exception_handler.py`) : pas de `try/except` ni de `Response` d'erreur à la main dans une vue ;
   - une `Meta` qui combine des parents hérite de leurs `Meta` quand ils y définissent des attributs.
 - **Typage** (section « Typage » de `CLAUDE.md`) : une fonction ou méthode écrite ou modifiée sans paramètres ni retour typés, un nouveau `typing.Dict/List/Optional`, un `# pyright: ignore` sans règle précise. Aucun outil ne le vérifie : c'est à la relecture de le voir. Tests et migrations exclus.
 - **Points propres au dépôt** à garder en tête :

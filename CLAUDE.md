@@ -35,7 +35,7 @@ Les règles à ne jamais enfreindre :
 - Filtres de liste : `FilterAPIViewMixin` (`base/views/mixins.py`, django-filter) en tête des parents de la vue, avec `filterset_fields` pour un filtre simple ou `filterset_class` (FilterSet dans `<app>/filters.py`) pour un champ calculé ou une relation traversée (ex. `?device=` de `/api/sensors/` via `pin__device`).
 - Les serializers héritent de `BaseSerializer` (`base/serializers/bases.py`) avec `Meta.model` et les `*MixinSerializer` de `base/serializers/mixins.py` ; pas de `ModelSerializer`. Lecture seule : `ReadOnlySerializer`.
 - Les modèles réutilisent les mixins abstraits de `base/models/mixins.py` (`Slug`, `Name`, `Description`, `ProtectedDisabled`, `ProtectedDeleted`, `Seeder`…). Les suppressions/désactivations protégées lèvent les exceptions de `base/exceptions.py`.
-- Les erreurs attendues sont gérées explicitement dans la vue ; `APIException` en dernier recours.
+- Les erreurs de l'API passent par le gestionnaire global `base/exception_handler.py` (`REST_FRAMEWORK["EXCEPTION_HANDLER"]`), qui donne à toute erreur le corps `{"status", "code", "message", "errors"}` : lever l'exception (DRF, Django ou `base/exceptions.py`), sans `try/except` ni `Response` d'erreur à la main dans la vue. Détail dans `.claude/rules/api.md`.
 - Une `Meta` qui combine des parents hérite explicitement de leurs `Meta` quand ils y définissent des attributs (ex. `class Meta(BaseSerializer.Meta, AutocompleteSlugMixinSerializer.Meta)` dans `orderlg/serializers/order.py`). Les `Meta` des modèles Django n'héritent pas.
 - Tests de vues : hériter de `ViewSetTestMixin` (`base/utils/tests.py`, `MODEL`, `BASE_PATTERN`, `DATA_TO_DEFAULT_OBJ`). Il n'y a pas de factories.
 

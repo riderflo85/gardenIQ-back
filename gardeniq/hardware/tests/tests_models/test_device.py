@@ -1,3 +1,4 @@
+import logging
 from enum import Enum
 
 from django.conf import settings
@@ -465,19 +466,21 @@ class TestDeviceCreatePinsWithDatasheet:
         # THEN
         assert available_channels_by_pin(device) == {0: ["digit", "pwm"], 26: ["analog", "digit"], 99: ["pwm"]}
 
-    def test_raises_when_a_channel_is_not_in_database(self, create_device):
+    def test_raises_when_a_channel_is_not_in_database(self, create_device, caplog):
         """A channel of available_channels that is not in the database is an error, not a channel to create."""
         # GIVEN
         Channel.objects.create(name="digit")
         device = create_device(DATASHEET)
 
         # WHEN / THEN
-        with pytest.raises(Channel.DoesNotExist) as exc_info:
-            device._create_pins_with_datasheet()
+        with caplog.at_level(logging.WARNING, logger="gardeniq.hardware.models.device"):
+            with pytest.raises(Channel.DoesNotExist) as exc_info:
+                device._create_pins_with_datasheet()
         assert "['analog', 'pwm']" in str(exc_info.value)
         assert str(device.category) in str(exc_info.value)
         assert Channel.objects.count() == 1
         assert not Pin.objects.exists()
+        assert [record.getMessage() for record in caplog.records] == [str(exc_info.value)]
 
     def test_writes_nothing_when_a_step_fails(self, channels, create_device, mocker):
         """A failure after the pins are created rolls them back: the method runs in one transaction."""

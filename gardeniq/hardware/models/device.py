@@ -1,3 +1,5 @@
+import logging
+
 from django.apps import apps
 from django.conf import settings
 from django.core.validators import RegexValidator
@@ -13,6 +15,8 @@ from gardeniq.base.models import SeederMixinModel
 from gardeniq.base.models import Status
 from gardeniq.hardware.protocols.settings import pattern_strict_version
 from gardeniq.hardware.validations import jsonschema_validation
+
+logger = logging.getLogger(__name__)
 
 
 class DeviceCategory(SeederMixinModel, NameMixinModel, OptionalDescriptionMixinModel):
@@ -249,9 +253,10 @@ class Device(NameMixinModel, OptionalDescriptionMixinModel):
         channel_ids: dict[str, int] = dict(Channel.objects.filter(name__in=channel_names).values_list("name", "pk"))
         # Channels belong to the seeder: a missing name is a datasheet or seeding error, not a channel to create.
         if missing_channel_names := set(channel_names) - channel_ids.keys():
-            raise Channel.DoesNotExist(
-                f"{self.category}: channels not found in database {sorted(missing_channel_names)}"
-            )
+            message = f"{self.category}: channels not found in database {sorted(missing_channel_names)}"
+            # The API only answers a 400 to the client: keep a server trace of this seeding or datasheet error.
+            logger.warning(message)
+            raise Channel.DoesNotExist(message)
 
         # {pin number: {pk of each channel available on this pin}}
         pins_with_chan: dict[int, set[int]] = {}

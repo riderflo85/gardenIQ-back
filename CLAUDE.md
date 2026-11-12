@@ -11,8 +11,8 @@ Tout passe par un environnement de dev pipenv: `pipenv shell`. Les commandes dja
 | Lint (écrit les corrections) | `black gardeniq` `isort .` `flake8 .` (`black` seul échoue : il faut un chemin) |
 | Lint comme la CI (sans écrire) | `black --check gardeniq` `isort --check-only --diff .` `flake8 .` |
 | Tous les hooks pre-commit | `pre-commit run --all-files` |
-| Tests | `pytest [options pytest]` (544 tests, ~2 min) |
-| Tests plus rapides | réutilise la base de test, `--reuse-db`, `-x` (stoppe au premier échec), parallélisation des tests avec `-n auto` (utilise pytest-xdist, ~35 s) |
+| Tests | `pytest [options pytest]` (728 tests, ~2 min) |
+| Tests plus rapides | réutilise la base de test, `--reuse-db`, `-x` (stoppe au premier échec), parallélisation des tests avec `-n auto` (utilise pytest-xdist, ~45 s) |
 | Un test précis | `pytest [options pytest] -- gardeniq/<app>/tests/<dossier>/<fichier>.py::<test>` |
 | Couverture (comme la CI) | `pytest --cov=. --cov-report=term-missing` |
 | Serveur, shell | `pipenv run server`, `pipenv run shell` (`shell_plus`) |
